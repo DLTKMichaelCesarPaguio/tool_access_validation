@@ -1,0 +1,23 @@
+# Access Inventory — Python Dependencies
+
+# ── Core ──────────────────────────────────────────────────────────────────────
+fastapi>=0.111,<1.0
+uvicorn[standard]>=0.29,<1.0
+httpx>=0.27,<1.0
+psycopg[binary]>=3.1,<4.0
+psycopg_pool>=3.2,<4.0
+ldap3>=2.9,<3.0
+python-dotenv>=1.0.0
+jinja2>=3.1,<4.0
+defusedxml>=0.7,<1.0
+python-multipart>=0.0.9,<1.0
+
+# ── Dev / Test ────────────────────────────────────────────────────────────────
+pytest>=7.4,<9.0
+pytest-asyncio>=0.23,<1.0
+pytest-mock>=3.11,<4.0
+pytest-cov>=4.1,<6.0
+black>=23.7
+flake8>=6.1
+mypy>=1.5
+respx>=0.21,<1.0
