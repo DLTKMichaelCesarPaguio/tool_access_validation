@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Access Inventory Lookup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f5f7;
+      color: #172b4d;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      width: 100%;
+      max-width: 860px;
+      margin-bottom: 1.5rem;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0052cc;
+    }
+
+    header p {
+      font-size: 0.875rem;
+      color: #5e6c84;
+      margin-top: 0.25rem;
+    }
+
+    .search-box {
+      width: 100%;
+      max-width: 860px;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-box form {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+    }
+
+    .search-box label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      margin-bottom: 0.375rem;
+      color: #344563;
+    }
+
+    .search-box input[type="text"] {
+      flex: 1;
+      height: 2.375rem;
+      padding: 0 0.75rem;
+      border: 1px solid #dfe1e6;
+      border-radius: 4px;
+      font-size: 0.9375rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .search-box input[type="text"]:focus {
+      border-color: #0052cc;
+      box-shadow: 0 0 0 2px rgba(0,82,204,.2);
+    }
+
+    .search-box button {
+      height: 2.375rem;
+      padding: 0 1.25rem;
+      background: #0052cc;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+
+    .search-box button:hover { background: #0747a6; }
+
+    .error-banner {
+      width: 100%;
+      max-width: 860px;
+      background: #ffebe6;
+      border: 1px solid #ff5630;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      color: #bf2600;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 860px;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.875rem;
+      color: #172b4d;
+      border-bottom: 1px solid #f4f5f7;
+      padding-bottom: 0.5rem;
+    }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.75rem 1.5rem;
+    }
+
+    .profile-field { display: flex; flex-direction: column; }
+
+    .profile-field .label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #5e6c84;
+      font-weight: 600;
+      margin-bottom: 0.1875rem;
+    }
+
+    .profile-field .value {
+      font-size: 0.9375rem;
+      color: #172b4d;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      text-align: left;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #5e6c84;
+      font-weight: 600;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 2px solid #dfe1e6;
+    }
+
+    tbody td {
+      padding: 0.625rem 0.75rem;
+      border-bottom: 1px solid #f4f5f7;
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #f8f9fa; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.175rem 0.5rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .badge-active   { background: #e3fcef; color: #006644; }
+    .badge-inactive { background: #ffe2d1; color: #bf2600; }
+    .badge-other    { background: #f4f5f7; color: #344563; }
+
+    .no-access {
+      color: #5e6c84;
+      font-size: 0.875rem;
+      padding: 0.5rem 0;
+    }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: #97a0af;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Access Inventory Lookup</h1>
+  <p>Search for a user's active tool access across all security environments.</p>
+</header>
+
+<div class="search-box">
+  <form method="post" action="/search">
+    <div style="flex:1">
+      <label for="email">Email address</label>
+      <input
+        id="email"
+        name="email"
+        type="text"
+        placeholder="firstname.lastname@deltek.com"
+        value="{{ query | e }}"
+        autocomplete="off"
+        autofocus
+      />
+    </div>
+    <button type="submit">Search</button>
+  </form>
+</div>
+
+{% if error %}
+<div class="error-banner" role="alert">{{ error | e }}</div>
+{% endif %}
+
+{% if ad_profile %}
+<div class="card">
+  <h2>Active Directory Profile</h2>
+  <div class="profile-grid">
+    <div class="profile-field">
+      <span class="label">Email</span>
+      <span class="value">{{ ad_profile.email or '—' }}</span>
+    </div>
+    <div class="profile-field">
+      <span class="label">Full Name</span>
+      <span class="value">{{ ad_profile.full_name or '—' }}</span>
+    </div>
+    <div class="profile-field">
+      <span class="label">Job Title</span>
+      <span class="value">{{ ad_profile.job_title or '—' }}</span>
+    </div>
+    <div class="profile-field">
+      <span class="label">Department</span>
+      <span class="value">{{ ad_profile.department or '—' }}</span>
+    </div>
+    <div class="profile-field">
+      <span class="label">Employee ID</span>
+      <span class="value">{{ ad_profile.employee_id or '—' }}</span>
+    </div>
+    <div class="profile-field">
+      <span class="label">AD Status</span>
+      <span class="value">
+        {% if ad_profile.is_active %}
+          <span class="badge badge-active">Active</span>
+        {% else %}
+          <span class="badge badge-inactive">Inactive</span>
+        {% endif %}
+      </span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if query %}
+<div class="card">
+  <h2>Tool Access
+    {% if tool_access %}
+      <span style="font-weight:400;font-size:.875rem;color:#5e6c84;margin-left:.5rem;">
+        {{ tool_access | length }} environment{{ 's' if tool_access | length != 1 }}
+      </span>
+    {% endif %}
+  </h2>
+
+  {% if tool_access %}
+  <table>
+    <thead>
+      <tr>
+        <th>Tool / Environment</th>
+        <th>Status</th>
+        <th>Role</th>
+        <th>Last Login</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in tool_access %}
+      <tr>
+        <td>{{ row.tool_name | e }}</td>
+        <td>
+          {% set s = (row.status or '') | lower %}
+          {% if 'active' in s %}
+            <span class="badge badge-active">{{ row.status | e }}</span>
+          {% elif 'inactive' in s or 'disabled' in s %}
+            <span class="badge badge-inactive">{{ row.status | e }}</span>
+          {% else %}
+            <span class="badge badge-other">{{ row.status or '—' }}</span>
+          {% endif %}
+        </td>
+        <td>{{ row.user_role or '—' }}</td>
+        <td>{{ row.last_login_date or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="no-access">No active tool access found for <strong>{{ query | e }}</strong>.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<footer>Deltek Global Information Security &mdash; Access Inventory v1</footer>
+
+</body>
+</html>
