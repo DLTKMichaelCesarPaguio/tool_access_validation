@@ -264,6 +264,175 @@ def test_search_by_username_single_match_loads_profile(client):
     assert "Kibria Ghulam" in response.text
 
 
+# ── GET /api/search ────────────────────────────────────────────────────────────
+
+
+def test_api_search_missing_q_returns_422(client):
+    response = client.get("/api/search")
+    assert response.status_code == 422
+
+
+def test_api_search_invalid_input_returns_error_json(client):
+    response = client.get("/api/search?q='; DROP TABLE users;--")
+    assert response.status_code == 200
+    data = response.json()
+    assert "Invalid search input" in (data.get("error") or "")
+    assert data["ad_profile"] is None
+    assert data["tool_access"] == []
+    assert data["picker_users"] == []
+
+
+def test_api_search_email_returns_profile(client):
+    mock_ad = {
+        "email": "dev@deltek.com", "full_name": "Dev User",
+        "job_title": "Engineer", "department": "IT",
+        "first_name": "Dev", "last_name": "User",
+        "employee_id": "EMP001", "is_active": True,
+    }
+    mock_access = [
+        {"work_email": "dev@deltek.com", "tool_name": "CrowdStrike",
+         "status": "active", "user_role": "admin",
+         "last_login_date": "2026-01-01", "updated_at": None},
+    ]
+
+    with patch("web.app._get_pool") as mock_pool_fn:
+        mock_conn = AsyncMock()
+        mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_conn.__aexit__ = AsyncMock(return_value=False)
+        mock_pool = MagicMock()
+        mock_pool.connection = MagicMock(return_value=mock_conn)
+        mock_pool_fn.return_value = mock_pool
+
+        with (
+            patch("web.app.queries.get_ad_profile", new_callable=AsyncMock, return_value=mock_ad),
+            patch("web.app.queries.get_tool_access", new_callable=AsyncMock, return_value=mock_access),
+        ):
+            response = client.get("/api/search?q=dev@deltek.com")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ad_profile"]["email"] == "dev@deltek.com"
+    assert data["tool_access"][0]["tool_name"] == "CrowdStrike"
+    assert data["picker_users"] == []
+    assert data["error"] is None
+
+
+def test_api_search_name_multiple_matches_returns_picker(client):
+    candidates = [
+        {"email": "michael.a@deltek.com", "full_name": "Michael A",
+         "first_name": "Michael", "last_name": "A", "job_title": "Dev", "department": "IT"},
+        {"email": "michael.b@deltek.com", "full_name": "Michael B",
+         "first_name": "Michael", "last_name": "B", "job_title": "QA", "department": "IT"},
+    ]
+
+    with patch("web.app._get_pool") as mock_pool_fn:
+        mock_conn = AsyncMock()
+        mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_conn.__aexit__ = AsyncMock(return_value=False)
+        mock_pool = MagicMock()
+        mock_pool.connection = MagicMock(return_value=mock_conn)
+        mock_pool_fn.return_value = mock_pool
+
+        with (
+            patch("web.app.queries.search_users_by_name",
+                  new_callable=AsyncMock, return_value=candidates),
+            patch("web.app.queries.search_users_by_username",
+                  new_callable=AsyncMock, return_value=[]),
+        ):
+            response = client.get("/api/search?q=michael")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["picker_users"]) == 2
+    assert data["ad_profile"] is None
+
+
+def test_api_search_username_returns_profile(client):
+    candidate = {
+        "email": "kibria@deltek.com", "full_name": "Kibria Ghulam",
+        "first_name": "Kibria", "last_name": "Ghulam",
+        "job_title": "Security", "department": "IT",
+    }
+    mock_ad = {**candidate, "employee_id": None, "is_active": True}
+
+    with patch("web.app._get_pool") as mock_pool_fn:
+        mock_conn = AsyncMock()
+        mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_conn.__aexit__ = AsyncMock(return_value=False)
+        mock_pool = MagicMock()
+        mock_pool.connection = MagicMock(return_value=mock_conn)
+        mock_pool_fn.return_value = mock_pool
+
+        with (
+            patch("web.app.queries.search_users_by_username",
+                  new_callable=AsyncMock, return_value=[candidate]),
+            patch("web.app.queries.search_users_by_name",
+                  new_callable=AsyncMock, return_value=[]),
+            patch("web.app.queries.get_ad_profile",
+                  new_callable=AsyncMock, return_value=mock_ad),
+            patch("web.app.queries.get_tool_access",
+                  new_callable=AsyncMock, return_value=[]),
+        ):
+            response = client.get("/api/search?q=detek3kg")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ad_profile"]["full_name"] == "Kibria Ghulam"
+
+
+def test_api_search_fullname_single_match(client):
+    candidate = {
+        "email": "michael.paguio@deltek.com", "full_name": "Michael Paguio",
+        "first_name": "Michael", "last_name": "Paguio",
+        "job_title": "Engineer", "department": "IT",
+    }
+    mock_ad = {**candidate, "employee_id": None, "is_active": True}
+
+    with patch("web.app._get_pool") as mock_pool_fn:
+        mock_conn = AsyncMock()
+        mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_conn.__aexit__ = AsyncMock(return_value=False)
+        mock_pool = MagicMock()
+        mock_pool.connection = MagicMock(return_value=mock_conn)
+        mock_pool_fn.return_value = mock_pool
+
+        with (
+            patch("web.app.queries.search_users_by_name",
+                  new_callable=AsyncMock, return_value=[candidate]),
+            patch("web.app.queries.get_ad_profile",
+                  new_callable=AsyncMock, return_value=mock_ad),
+            patch("web.app.queries.get_tool_access",
+                  new_callable=AsyncMock, return_value=[]),
+        ):
+            response = client.get("/api/search?q=michael paguio")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ad_profile"]["email"] == "michael.paguio@deltek.com"
+
+
+def test_api_search_post_search_still_returns_html(client):
+    """Ensure POST /search still returns HTML after the _run_search refactor."""
+    with patch("web.app._get_pool") as mock_pool_fn:
+        mock_conn = AsyncMock()
+        mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_conn.__aexit__ = AsyncMock(return_value=False)
+        mock_pool = MagicMock()
+        mock_pool.connection = MagicMock(return_value=mock_conn)
+        mock_pool_fn.return_value = mock_pool
+
+        with (
+            patch("web.app.queries.search_users_by_username",
+                  new_callable=AsyncMock, return_value=[]),
+            patch("web.app.queries.search_users_by_name",
+                  new_callable=AsyncMock, return_value=[]),
+        ):
+            response = client.post("/search", data={"email": "nobody"})
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+
 def test_search_no_results_shows_no_access_message(client):
     """Query that matches nothing shows the no-access message."""
     with patch("web.app._get_pool") as mock_pool_fn:

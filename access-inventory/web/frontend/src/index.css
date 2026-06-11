@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* ── Tailwind v4: dark mode via data-theme attribute ── */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* ── Design token bridge: Tailwind utilities → CSS vars ── */
+@theme {
+  --color-deltek-blue: #1742F5;
+  --color-deltek-navy: #070D63;
+  --color-deltek-black: #00021D;
+
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-border-light: var(--border-light);
+  --color-border-medium: var(--border-medium);
+
+  --font-family-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+@layer base {
+  /* ── Light (default) ── */
+  :root,
+  [data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --bg-tertiary: #f3f4f6;
+    --text-primary: #00021D;
+    --text-secondary: #3C454E;
+    --text-tertiary: #6b7280;
+    --border-light: #e5e7eb;
+    --border-medium: #d1d5db;
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  }
+
+  /* ── Dark (manual override) ── */
+  [data-theme="dark"] {
+    --bg-primary: #0d0f1a;
+    --bg-secondary: #080a12;
+    --bg-tertiary: #111420;
+    --text-primary: #e8eaf6;
+    --text-secondary: #9ca3c8;
+    --text-tertiary: #5c6080;
+    --border-light: rgba(255,255,255,0.08);
+    --border-medium: rgba(255,255,255,0.12);
+    --shadow-md: 0 4px 16px -2px rgba(0,0,0,0.5);
+  }
+
+  /* ── System preference fallback ── */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --bg-primary: #0d0f1a;
+      --bg-secondary: #080a12;
+      --bg-tertiary: #111420;
+      --text-primary: #e8eaf6;
+      --text-secondary: #9ca3c8;
+      --text-tertiary: #5c6080;
+      --border-light: rgba(255,255,255,0.08);
+      --border-medium: rgba(255,255,255,0.12);
+      --shadow-md: 0 4px 16px -2px rgba(0,0,0,0.5);
+    }
+  }
+
+  html {
+    font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  body {
+    background-color: var(--bg-secondary);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Deltek brand accent strip (4px rainbow top bar) ── */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg,
+      #00B6C3 0%,
+      #1742F5 25%,
+      #6D18F1 50%,
+      #C200CC 75%,
+      #08E9EB 100%
+    );
+    z-index: 9999;
+  }
+}
