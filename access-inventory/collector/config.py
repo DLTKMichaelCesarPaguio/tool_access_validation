@@ -29,6 +29,7 @@ LDAP_BIND_DN: str = _require("LDAP_BIND_DN")
 LDAP_BIND_PASSWORD: str = _require("LDAP_BIND_PASSWORD")
 LDAP_BASE_DN: str = _require("LDAP_BASE_DN")
 LDAP_SEARCH_ATTRIBUTE: str = _get("LDAP_SEARCH_ATTRIBUTE", "mail")
+LDAP_CA_CERT: str = _get("LDAP_CA_CERT", "")
 
 # ── Web App ───────────────────────────────────────────────────────────────────
 WEB_PORT: int = int(_get("WEB_PORT", "8001"))

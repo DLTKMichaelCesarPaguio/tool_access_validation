@@ -88,6 +88,7 @@ async def search(
                 bind_password=config.LDAP_BIND_PASSWORD,
                 base_dn=config.LDAP_BASE_DN,
                 email=email,
+                ca_cert=config.LDAP_CA_CERT,
             )
             if ldap_results:
                 ad_profile = ldap_results[0]

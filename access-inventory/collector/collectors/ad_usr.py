@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ldap3 import ALL_ATTRIBUTES, Connection, Server
+from ldap3 import Connection
 from ldap3.core.exceptions import LDAPException
 
 from collector import database
+from collector.ldap_tls import build_server
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class AdCollector:
         bind_dn: str,
         bind_password: str,
         base_dn: str,
+        ca_cert: str = "",
     ) -> None:
         self.host = host
         self.port = port
@@ -47,10 +49,11 @@ class AdCollector:
         self.bind_dn = bind_dn
         self.bind_password = bind_password
         self.base_dn = base_dn
+        self.ca_cert = ca_cert
 
     def run(self, conn: Any) -> int:
         """Fetch all AD users and upsert them into `users`. Returns row count."""
-        server = Server(self.host, port=self.port, use_ssl=self.use_ssl)
+        server = build_server(self.host, self.port, self.use_ssl, self.ca_cert)
 
         with Connection(
             server,

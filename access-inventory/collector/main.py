@@ -173,6 +173,7 @@ async def _run_ad_collector(conn: psycopg.AsyncConnection) -> None:
             bind_dn=config.LDAP_BIND_DN,
             bind_password=config.LDAP_BIND_PASSWORD,
             base_dn=config.LDAP_BASE_DN,
+            ca_cert=config.LDAP_CA_CERT,
         )
         count = await asyncio.to_thread(ad.run, conn)
         logger.info("AdCollector: synced %d users from AD", count)

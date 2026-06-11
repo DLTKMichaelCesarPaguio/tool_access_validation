@@ -3,8 +3,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ldap3 import Connection, Server
+from ldap3 import Connection
 from ldap3.core.exceptions import LDAPException
+
+from collector.ldap_tls import build_server
 
 # Only allow characters safe in LDAP filter values to prevent injection
 _SAFE_INPUT_RE = re.compile(r"^[a-zA-Z0-9._@\-]+$")
@@ -32,6 +34,7 @@ def search_by_email(
     bind_password: str,
     base_dn: str,
     email: str,
+    ca_cert: str = "",
 ) -> list[dict]:
     """Search AD for users matching the given email prefix or full address.
 
@@ -41,7 +44,7 @@ def search_by_email(
     _sanitize(email)
     search_filter = f"(mail={email}*)"
 
-    server = Server(host, port=port, use_ssl=use_ssl)
+    server = build_server(host, port, use_ssl, ca_cert)
     with Connection(
         server,
         user=bind_dn,

@@ -50,7 +50,7 @@ class TestAdCollector:
         conn_cls = MagicMock(return_value=mock_conn)
 
         with patch("collector.collectors.ad_usr.Connection", conn_cls), \
-             patch("collector.collectors.ad_usr.Server"):
+             patch("collector.ldap_tls.build_server", return_value=MagicMock()):
             with patch("collector.database.upsert_users") as mock_upsert:
                 db_conn = MagicMock()
                 self._collector().run(db_conn)
@@ -71,7 +71,7 @@ class TestAdCollector:
         mock_conn = _make_connection([entry])
 
         with patch("collector.collectors.ad_usr.Connection", MagicMock(return_value=mock_conn)), \
-             patch("collector.collectors.ad_usr.Server"):
+             patch("collector.ldap_tls.build_server", return_value=MagicMock()):
             with patch("collector.database.upsert_users") as mock_upsert:
                 db_conn = MagicMock()
                 self._collector().run(db_conn)
@@ -97,7 +97,7 @@ class TestAdCollector:
         mock_conn = _make_connection([entry])
 
         with patch("collector.collectors.ad_usr.Connection", MagicMock(return_value=mock_conn)), \
-             patch("collector.collectors.ad_usr.Server"):
+             patch("collector.ldap_tls.build_server", return_value=MagicMock()):
             with patch("collector.database.upsert_users") as mock_upsert:
                 db_conn = MagicMock()
                 # Should not raise
@@ -111,7 +111,7 @@ class TestAdCollector:
         from ldap3.core.exceptions import LDAPException
 
         with patch("collector.collectors.ad_usr.Connection") as conn_cls, \
-             patch("collector.collectors.ad_usr.Server"):
+             patch("collector.ldap_tls.build_server", return_value=MagicMock()):
             conn_cls.return_value.__enter__ = MagicMock(
                 side_effect=LDAPException("bind failed")
             )
