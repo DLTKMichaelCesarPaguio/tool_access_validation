@@ -49,7 +49,7 @@ export default function Header() {
               color: '#ffffff',
             }}
           >
-            Access Inventory Lookup
+            ToolScope
           </h1>
           <p
             style={{

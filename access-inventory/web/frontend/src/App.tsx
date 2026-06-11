@@ -54,7 +54,7 @@ export default function App() {
         )}
 
         <footer className="mt-6 text-xs text-center" style={{ color: 'var(--text-tertiary)' }}>
-          Deltek Global Information Security &mdash; Access Inventory v1
+          Deltek Global Information Security &mdash; ToolScope v1
         </footer>
       </div>
     </div>
