@@ -100,12 +100,8 @@ BLACKDUCK_API_TOKEN: str = _get("BLACKDUCK_API_TOKEN")
 BLACKDUCK_BASE_URL: str = _get("BLACKDUCK_BASE_URL", "https://blackduck.example.com")
 BLACKDUCK_TOOL_NAME: str = _get("BLACKDUCK_TOOL_NAME", "Blackduck")
 
-# ── Checkmarx ─────────────────────────────────────────────────────────────────
-CHECKMARX_CLIENT_ID: str = _get("CHECKMARX_CLIENT_ID")
-CHECKMARX_CLIENT_SECRET: str = _get("CHECKMARX_CLIENT_SECRET")
-CHECKMARX_TENANT: str = _get("CHECKMARX_TENANT")
-CHECKMARX_BASE_URL: str = _get("CHECKMARX_BASE_URL", "https://eu.iam.checkmarx.net")
-CHECKMARX_API_BASE_URL: str = _get(
-    "CHECKMARX_API_BASE_URL", "https://eu.ast.checkmarx.net"
-)
+# ── Checkmarx Enterprise (CxSAST) ─────────────────────────────────────────────
+CHECKMARX_BASE_URL: str = _get("CHECKMARX_BASE_URL", "https://checkmarx.example.com")
+CHECKMARX_USERNAME: str = _get("CHECKMARX_USERNAME")
+CHECKMARX_PASSWORD: str = _get("CHECKMARX_PASSWORD")
 CHECKMARX_TOOL_NAME: str = _get("CHECKMARX_TOOL_NAME", "Checkmarx")

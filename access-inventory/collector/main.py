@@ -127,15 +127,12 @@ def _build_collectors() -> list[Any]:
             tool_id=config.BLACKDUCK_TOOL_NAME,
         ))
 
-    # Checkmarx
-    if (config.CHECKMARX_CLIENT_ID and config.CHECKMARX_CLIENT_SECRET
-            and config.CHECKMARX_TENANT):
+    # Checkmarx Enterprise
+    if config.CHECKMARX_USERNAME and config.CHECKMARX_PASSWORD:
         collectors.append(CheckmarxCollector(
-            client_id=config.CHECKMARX_CLIENT_ID,
-            client_secret=config.CHECKMARX_CLIENT_SECRET,
-            iam_base_url=config.CHECKMARX_BASE_URL,
-            api_base_url=config.CHECKMARX_API_BASE_URL,
-            tenant=config.CHECKMARX_TENANT,
+            base_url=config.CHECKMARX_BASE_URL,
+            username=config.CHECKMARX_USERNAME,
+            password=config.CHECKMARX_PASSWORD,
             tool_id=config.CHECKMARX_TOOL_NAME,
         ))
 

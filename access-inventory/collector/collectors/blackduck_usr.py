@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import httpx
@@ -36,7 +37,9 @@ class BlackDuckCollector(BaseCollector):
                 "Authorization": f"Bearer {bearer}",
                 "Accept": _BD_USER_ACCEPT,
             }
-            return await self._get_users(client, headers)
+            users = await self._get_users(client, headers)
+            await self._enrich_roles(client, headers, users)
+            return users
 
     async def _get_bearer(self, client: httpx.AsyncClient) -> str:
         resp = await client.post(
@@ -67,11 +70,16 @@ class BlackDuckCollector(BaseCollector):
                 email = (u.get("email") or u.get("userName") or "").lower()
                 if not email:
                     continue
+                roles_href = next(
+                    (l["href"] for l in u.get("_meta", {}).get("links", []) if l["rel"] == "roles"),
+                    None,
+                )
                 rows.append({
                     "work_email": email,
-                    "status": "active",
-                    "user_role": u.get("type"),
+                    "status": "active" if u.get("active", True) else "inactive",
+                    "user_role": None,
                     "last_login_date": None,
+                    "_roles_href": roles_href,
                 })
 
             total = data.get("totalCount", 0)
@@ -79,5 +87,25 @@ class BlackDuckCollector(BaseCollector):
             if not items or offset >= total:
                 break
 
-        logger.info("BlackDuck: collected %d users", len(rows))
         return rows
+
+    async def _fetch_roles(
+        self, client: httpx.AsyncClient, headers: dict, row: dict
+    ) -> None:
+        href = row.pop("_roles_href", None)
+        if not href:
+            return
+        try:
+            resp = await client.get(href, headers=headers)
+            resp.raise_for_status()
+            items = resp.json().get("items") or []
+            names = [r["name"] for r in items if r.get("name")]
+            row["user_role"] = ", ".join(names) or None
+        except Exception as exc:
+            logger.warning("BlackDuck: failed to fetch roles for %s: %s", row["work_email"], exc)
+
+    async def _enrich_roles(
+        self, client: httpx.AsyncClient, headers: dict, rows: list[dict]
+    ) -> None:
+        await asyncio.gather(*[self._fetch_roles(client, headers, r) for r in rows])
+        logger.info("BlackDuck: collected %d users", len(rows))

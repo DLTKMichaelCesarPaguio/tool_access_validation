@@ -10,22 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 class CheckmarxCollector(BaseCollector):
-    """Collects user accounts from Checkmarx One via OAuth2 client credentials."""
+    """Collects user accounts from Checkmarx Enterprise (CxSAST) via REST API."""
 
-    def __init__(
-        self,
-        client_id: str,
-        client_secret: str,
-        tenant: str,
-        iam_base_url: str,
-        api_base_url: str,
-        tool_id: int,
-    ) -> None:
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.tenant = tenant
-        self.iam_base_url = iam_base_url.rstrip("/")
-        self.api_base_url = api_base_url.rstrip("/")
+    def __init__(self, base_url: str, username: str, password: str, tool_id: int) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.username = username
+        self.password = password
         self.tool_id = tool_id
 
     async def collect(self) -> list[dict]:
@@ -42,64 +32,57 @@ class CheckmarxCollector(BaseCollector):
         async with make_client(timeout=30.0) as client:
             token = await self._get_token(client)
             headers = {"Authorization": f"Bearer {token}"}
-            return await self._get_users(client, headers)
+            role_map = await self._get_role_map(client, headers)
+            return await self._get_users(client, headers, role_map)
 
     async def _get_token(self, client: httpx.AsyncClient) -> str:
         resp = await client.post(
-            f"{self.iam_base_url}/auth/realms/{self.tenant}/protocol/openid-connect/token",
+            f"{self.base_url}/cxrestapi/auth/identity/connect/token",
             data={
-                "grant_type": "client_credentials",
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
+                "grant_type": "password",
+                "username": self.username,
+                "password": self.password,
+                "client_id": "resource_owner_client",
+                "client_secret": "014DF517-39D1-4453-B7B3-9930C563627C",
+                "scope": "sast_rest_api access_control_api",
             },
         )
         resp.raise_for_status()
         return resp.json()["access_token"]
 
-    async def _get_users(
+    async def _get_role_map(
         self, client: httpx.AsyncClient, headers: dict
+    ) -> dict[int, str]:
+        resp = await client.get(
+            f"{self.base_url}/cxrestapi/auth/Roles",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        return {r["id"]: r["name"] for r in resp.json()}
+
+    async def _get_users(
+        self, client: httpx.AsyncClient, headers: dict, role_map: dict[int, str]
     ) -> list[dict]:
+        resp = await client.get(
+            f"{self.base_url}/cxrestapi/auth/Users",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        items = resp.json()
+
         rows: list[dict] = []
-        offset = 0
-        limit = 100
-        total: int | None = None
-
-        while True:
-            resp = await client.get(
-                f"{self.api_base_url}/api/1.0/users",
-                headers=headers,
-                params={"offset": offset, "limit": limit},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            # Checkmarx may return a list or a dict with a users key + totalCount
-            if isinstance(data, list):
-                items = data
-            else:
-                items = data.get("users") or []
-                if total is None:
-                    total = data.get("totalCount")
-
-            for u in items:
-                email = (u.get("email") or "").lower()
-                if not email:
-                    continue
-                is_active = u.get("active", True)
-                rows.append({
-                    "work_email": email,
-                    "status": "active" if is_active else "inactive",
-                    "user_role": ", ".join(u.get("roles") or []) or u.get("role"),
-                    "last_login_date": u.get("lastLoginDate"),
-                })
-
-            offset += len(items)
-            # Stop when we've fetched all known records, or there were no items
-            if not items:
-                break
-            if total is not None and offset >= total:
-                break
-            if len(items) < limit and total is None:
-                break
+        for u in items:
+            email = (u.get("email") or "").lower()
+            if not email:
+                continue
+            role_ids = u.get("roleIds") or []
+            role_names = ", ".join(role_map[rid] for rid in role_ids if rid in role_map)
+            rows.append({
+                "work_email": email,
+                "status": "active" if u.get("active", True) else "inactive",
+                "user_role": role_names or None,
+                "last_login_date": u.get("lastLoginDate"),
+            })
 
         logger.info("Checkmarx: collected %d users", len(rows))
         return rows

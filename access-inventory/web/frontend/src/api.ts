@@ -12,6 +12,7 @@ export interface AdProfile {
 export interface ToolRow {
   work_email?: string
   tool_name?: string
+  category?: string
   username?: string
   status?: string
   user_role?: string

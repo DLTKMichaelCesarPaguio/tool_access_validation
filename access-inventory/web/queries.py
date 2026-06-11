@@ -4,7 +4,6 @@ from typing import Any
 
 import psycopg
 
-_BLACKDUCK_NAME = "blackduck"
 _PICKER_LIMIT = 50
 
 _TOOL_ACCESS_SQL = """
@@ -12,10 +11,11 @@ SELECT
     uta.work_email,
     uta.tool_id,
     t.tool_name,
-    CASE WHEN t.tool_name ILIKE %s THEN 'Active Access' ELSE uta.status END AS status,
+    t.category,
+    uta.status,
     uta.user_role,
     uta.username,
-    CASE WHEN t.tool_name ILIKE %s THEN 'N/A' ELSE uta.last_login_date END AS last_login_date,
+    uta.last_login_date,
     uta.updated_at
 FROM user_tool_access uta
 JOIN tools t ON t.tool_id = uta.tool_id
@@ -41,9 +41,8 @@ LIMIT 1
 
 async def get_tool_access(conn: psycopg.AsyncConnection, email: str) -> list[dict]:
     """Return all tool access rows for a given email address."""
-    bd_pattern = f"%{_BLACKDUCK_NAME}%"
     async with conn.cursor() as cur:
-        await cur.execute(_TOOL_ACCESS_SQL, (bd_pattern, bd_pattern, email))
+        await cur.execute(_TOOL_ACCESS_SQL, (email,))
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, row)) async for row in cur]
 
@@ -131,3 +130,16 @@ async def search_users_by_username(
         await cur.execute(_SEARCH_BY_USERNAME_SQL, (pattern, _PICKER_LIMIT))
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, row)) async for row in cur]
+
+
+async def get_email_by_employee_id(
+    conn: psycopg.AsyncConnection, employee_id: str
+) -> str | None:
+    """Return the email for an exact employee_id match, or None if not found."""
+    async with conn.cursor() as cur:
+        await cur.execute(
+            "SELECT email FROM users WHERE employee_id = %s LIMIT 1",
+            (employee_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else None

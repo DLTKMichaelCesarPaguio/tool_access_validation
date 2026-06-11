@@ -57,9 +57,19 @@ async def _run_search(pool: AsyncConnectionPool, query: str) -> dict:
     resolved_email: str | None = None
 
     is_email = "@" in query
-    is_fullname = not is_email and " " in query
+    is_employee_id = not is_email and query.isdigit()
+    is_fullname = not is_email and not is_employee_id and " " in query
 
-    if is_email:
+    if is_employee_id:
+        try:
+            async with pool.connection() as conn:
+                resolved_email = await queries.get_email_by_employee_id(conn, query)
+            if resolved_email is None:
+                error = f"Employee ID {query!r} not found."
+        except Exception as exc:
+            error = f"Database error: {exc}"
+
+    elif is_email:
         resolved_email = query
         try:
             async with pool.connection() as conn:
@@ -175,12 +185,17 @@ async def _run_search(pool: AsyncConnectionPool, query: str) -> dict:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return _templates.TemplateResponse(
-        request,
-        "index.html",
-        {"query": "", "ad_profile": None, "tool_access": [], "picker_users": [], "error": None},
-    )
+async def index():
+    # Serve the React SPA when dist/ exists; fall back to Jinja2 template for curl/dev use
+    spa_index = os.path.join(_DIST_DIR, "index.html")
+    if os.path.isfile(spa_index):
+        return HTMLResponse(open(spa_index).read())
+    from fastapi import Request as _Req
+    from fastapi.templating import Jinja2Templates as _T
+    t = _T(directory="web/templates")
+    # Minimal fallback — can't inject Request here without changing signature,
+    # so just return the raw template file for curl use.
+    return HTMLResponse(open("web/templates/index.html").read())
 
 
 @app.get("/api/search")

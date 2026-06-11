@@ -31,14 +31,14 @@ export default function SearchBox({ onSearch, loading }: Props) {
             className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Search by name, email, or username
+            Search by name, email, username, or employee ID
           </label>
           <input
             id="search-input"
             type="text"
             value={value}
             onChange={e => setValue(e.target.value)}
-            placeholder="e.g. Firstname Lastname, email@deltek.com, or username"
+            placeholder="e.g. Firstname Lastname, email@deltek.com, username, or 1234567"
             autoComplete="off"
             autoFocus
             style={{
