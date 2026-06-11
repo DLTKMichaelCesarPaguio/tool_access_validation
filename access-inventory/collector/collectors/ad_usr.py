@@ -51,8 +51,8 @@ class AdCollector:
         self.base_dn = base_dn
         self.ca_cert = ca_cert
 
-    def run(self, conn: Any) -> int:
-        """Fetch all AD users and upsert them into `users`. Returns row count."""
+    def fetch(self) -> list[dict]:
+        """Fetch all AD users and return them as a list of dicts (no DB call)."""
         server = build_server(self.host, self.port, self.use_ssl, self.ca_cert)
 
         with Connection(
@@ -69,8 +69,13 @@ class AdCollector:
             entries = ldap_conn.entries
 
         rows = [self._map(e) for e in entries]
-        rows = [r for r in rows if r.get("email")]  # skip entries with no email
-        database.upsert_users(conn, rows)
+        return [r for r in rows if r.get("email")]
+
+    def run(self, conn: Any) -> int:
+        """Kept for backwards compatibility with sync callers (tests)."""
+        import asyncio
+        rows = self.fetch()
+        asyncio.get_event_loop().run_until_complete(database.upsert_users(conn, rows))
         logger.info("ad_usr: synced %d users from AD", len(rows))
         return len(rows)
 

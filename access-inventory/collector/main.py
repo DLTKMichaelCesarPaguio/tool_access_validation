@@ -184,8 +184,9 @@ async def _run_ad_collector(conn: psycopg.AsyncConnection) -> None:
             base_dn=config.LDAP_BASE_DN,
             ca_cert=config.LDAP_CA_CERT,
         )
-        count = await asyncio.to_thread(ad.run, conn)
-        logger.info("AdCollector: synced %d users from AD", count)
+        rows = await asyncio.to_thread(ad.fetch)
+        await upsert_users(conn, rows)
+        logger.info("AdCollector: synced %d users from AD", len(rows))
     except Exception as exc:
         logger.error("AdCollector: unhandled error during sync: %s", exc)
 

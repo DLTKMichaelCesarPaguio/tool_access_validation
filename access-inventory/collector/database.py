@@ -7,7 +7,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def upsert_users(conn: Any, rows: list[dict]) -> None:
+async def upsert_users(conn: Any, rows: list[dict]) -> None:
     """Upsert user rows into the `users` table.
 
     Upsert key: `email` (existing UNIQUE constraint).
@@ -37,9 +37,9 @@ def upsert_users(conn: Any, rows: list[dict]) -> None:
               (EXCLUDED.first_name, EXCLUDED.last_name,
                EXCLUDED.job_title, EXCLUDED.department, EXCLUDED.is_active)
     """
-    with conn.cursor() as cur:
+    async with conn.cursor() as cur:
         for row in rows:
-            cur.execute(sql, (
+            await cur.execute(sql, (
                 row.get("email"),
                 row.get("first_name"),
                 row.get("last_name"),
@@ -52,7 +52,7 @@ def upsert_users(conn: Any, rows: list[dict]) -> None:
     logger.info("upsert_users: processed %d rows", len(rows))
 
 
-def upsert_tool_access(conn: Any, tool_id: str, rows: list[dict]) -> None:
+async def upsert_tool_access(conn: Any, tool_id: str, rows: list[dict]) -> None:
     """Upsert tool access rows into `user_tool_access`.
 
     Upsert key: (tool_id, work_email) — requires the uq_tool_user constraint
@@ -67,7 +67,7 @@ def upsert_tool_access(conn: Any, tool_id: str, rows: list[dict]) -> None:
         INSERT INTO user_tool_access (
             tool_id, work_email, status, user_role, last_login_date, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, NOW())
+        VALUES (%s::uuid, %s, %s, %s, %s, NOW())
         ON CONFLICT (tool_id, work_email) DO UPDATE SET
             user_role       = EXCLUDED.user_role,
             status          = EXCLUDED.status,
@@ -78,9 +78,9 @@ def upsert_tool_access(conn: Any, tool_id: str, rows: list[dict]) -> None:
            IS DISTINCT FROM
               (EXCLUDED.user_role, EXCLUDED.status, EXCLUDED.last_login_date)
     """
-    with conn.cursor() as cur:
+    async with conn.cursor() as cur:
         for row in rows:
-            cur.execute(sql, (
+            await cur.execute(sql, (
                 tool_id,
                 row.get("work_email"),
                 row.get("status"),
@@ -91,7 +91,7 @@ def upsert_tool_access(conn: Any, tool_id: str, rows: list[dict]) -> None:
     logger.info("upsert_tool_access: tool_id=%s processed %d rows", tool_id, len(rows))
 
 
-def soft_delete_absent(
+async def soft_delete_absent(
     conn: Any, tool_id: str, present_emails: list[str]
 ) -> None:
     """Mark as inactive any active tool access rows not in `present_emails`.
@@ -99,13 +99,12 @@ def soft_delete_absent(
     Looks up `access_audit_log` for a DELETE record to get the accurate
     deactivation date. Falls back to NOW() when no log entry exists.
     """
-    # Find active rows for this tool whose email is no longer present
     find_sql = """
-        SELECT work_email, tool_id
+        SELECT work_email
         FROM user_tool_access
-        WHERE tool_id = %s
+        WHERE tool_id = %s::uuid
           AND status != 'inactive'
-          AND work_email NOT IN %s
+          AND work_email != ALL(%s)
     """
     audit_sql = """
         SELECT change_timestamp
@@ -121,39 +120,36 @@ def soft_delete_absent(
         SET status            = 'inactive',
             deactivation_date = %s,
             updated_at        = NOW()
-        WHERE tool_id   = %s
+        WHERE tool_id   = %s::uuid
           AND work_email = %s
           AND status    != 'inactive'
     """
 
-    with conn.cursor() as cur:
-        # Use a sentinel tuple to handle empty list (NOT IN () is invalid SQL)
-        emails_tuple = tuple(present_emails) if present_emails else ("__no_match__",)
-        cur.execute(find_sql, (tool_id, emails_tuple))
-        absent_rows = cur.fetchall()
+    async with conn.cursor() as cur:
+        await cur.execute(find_sql, (tool_id, list(present_emails)))
+        absent_rows = await cur.fetchall()
 
         for row in absent_rows:
-            email = row["work_email"]
+            email = row[0]
 
-            # Try to find the deactivation date from the audit log
-            cur.execute(audit_sql, (tool_id, email))
-            log_entry = cur.fetchone()
+            await cur.execute(audit_sql, (tool_id, email))
+            log_entry = await cur.fetchone()
 
-            if log_entry and log_entry.get("change_timestamp"):
-                deactivation_date = log_entry["change_timestamp"]
+            if log_entry and log_entry[0]:
+                deactivation_date = log_entry[0]
             else:
                 deactivation_date = datetime.now(timezone.utc)
 
-            cur.execute(update_sql, (deactivation_date, tool_id, email))
+            await cur.execute(update_sql, (deactivation_date, tool_id, email))
             logger.info(
                 "soft_delete_absent: marked %s inactive for tool_id=%s (date=%s)",
                 email, tool_id, deactivation_date,
             )
 
 
-def update_last_sync(conn: Any, tool_id: str) -> None:
+async def update_last_sync(conn: Any, tool_id: str) -> None:
     """Update `tools.last_sync_at` to NOW() for the given tool UUID."""
     sql = "UPDATE tools SET last_sync_at = NOW() WHERE tool_id = %s::uuid"
-    with conn.cursor() as cur:
-        cur.execute(sql, (tool_id,))
+    async with conn.cursor() as cur:
+        await cur.execute(sql, (tool_id,))
     logger.debug("update_last_sync: tool_id=%s", tool_id)
