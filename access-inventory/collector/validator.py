@@ -21,7 +21,7 @@ _STALE_DAYS = 90
 
 _ORPHAN_SQL = """
 SELECT
-    uta.id,
+    uta.access_id,
     uta.work_email,
     uta.tool_id,
     t.tool_name,
@@ -31,7 +31,7 @@ SELECT
     CASE WHEN t.tool_name ILIKE %s THEN 'N/A' ELSE uta.last_login_date END AS display_last_login,
     CASE WHEN t.tool_name ILIKE %s THEN 'Active Access' ELSE uta.status END AS display_status
 FROM user_tool_access uta
-JOIN tools t ON t.id = uta.tool_id
+JOIN tools t ON t.tool_id = uta.tool_id
 LEFT JOIN users u ON lower(u.email) = lower(uta.work_email)
 WHERE uta.status = 'active'
   AND u.email IS NULL
@@ -40,7 +40,7 @@ ORDER BY t.tool_name, uta.work_email
 
 _STALE_SQL = """
 SELECT
-    uta.id,
+    uta.access_id,
     uta.work_email,
     uta.tool_id,
     t.tool_name,
@@ -50,7 +50,7 @@ SELECT
     CASE WHEN t.tool_name ILIKE %s THEN 'N/A' ELSE uta.last_login_date END AS display_last_login,
     CASE WHEN t.tool_name ILIKE %s THEN 'Active Access' ELSE uta.status END AS display_status
 FROM user_tool_access uta
-JOIN tools t ON t.id = uta.tool_id
+JOIN tools t ON t.tool_id = uta.tool_id
 LEFT JOIN users u ON lower(u.email) = lower(uta.work_email)
 WHERE uta.status = 'active'
   AND t.tool_name NOT ILIKE %s

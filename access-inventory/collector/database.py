@@ -12,18 +12,18 @@ def upsert_users(conn: Any, rows: list[dict]) -> None:
 
     Upsert key: `email` (existing UNIQUE constraint).
     Only updates rows whose field values have actually changed.
+    Note: full_name is a GENERATED column (first_name || ' ' || last_name) — not inserted.
     """
     if not rows:
         return
 
     sql = """
         INSERT INTO users (
-            email, full_name, first_name, last_name,
+            email, first_name, last_name,
             job_title, department, employee_id, is_active, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
         ON CONFLICT (email) DO UPDATE SET
-            full_name   = EXCLUDED.full_name,
             first_name  = EXCLUDED.first_name,
             last_name   = EXCLUDED.last_name,
             job_title   = EXCLUDED.job_title,
@@ -31,17 +31,16 @@ def upsert_users(conn: Any, rows: list[dict]) -> None:
             employee_id = EXCLUDED.employee_id,
             is_active   = EXCLUDED.is_active,
             updated_at  = NOW()
-        WHERE (users.full_name, users.first_name, users.last_name,
+        WHERE (users.first_name, users.last_name,
                users.job_title, users.department, users.is_active)
            IS DISTINCT FROM
-              (EXCLUDED.full_name, EXCLUDED.first_name, EXCLUDED.last_name,
+              (EXCLUDED.first_name, EXCLUDED.last_name,
                EXCLUDED.job_title, EXCLUDED.department, EXCLUDED.is_active)
     """
     with conn.cursor() as cur:
         for row in rows:
             cur.execute(sql, (
                 row.get("email"),
-                row.get("full_name"),
                 row.get("first_name"),
                 row.get("last_name"),
                 row.get("job_title"),
@@ -53,12 +52,13 @@ def upsert_users(conn: Any, rows: list[dict]) -> None:
     logger.info("upsert_users: processed %d rows", len(rows))
 
 
-def upsert_tool_access(conn: Any, tool_id: int, rows: list[dict]) -> None:
+def upsert_tool_access(conn: Any, tool_id: str, rows: list[dict]) -> None:
     """Upsert tool access rows into `user_tool_access`.
 
     Upsert key: (tool_id, work_email) — requires the uq_tool_user constraint
     from migrations/001_add_upsert_constraint.sql.
     Only updates rows whose field values have actually changed.
+    tool_id is a UUID string.
     """
     if not rows:
         return
@@ -92,7 +92,7 @@ def upsert_tool_access(conn: Any, tool_id: int, rows: list[dict]) -> None:
 
 
 def soft_delete_absent(
-    conn: Any, tool_id: int, present_emails: list[str]
+    conn: Any, tool_id: str, present_emails: list[str]
 ) -> None:
     """Mark as inactive any active tool access rows not in `present_emails`.
 
@@ -110,7 +110,7 @@ def soft_delete_absent(
     audit_sql = """
         SELECT change_timestamp
         FROM access_audit_log
-        WHERE (old_values->>'tool_id')::int = %s
+        WHERE (old_values->>'tool_id')::uuid = %s::uuid
           AND old_values->>'work_email' = %s
           AND change_type = 'DELETE'
         ORDER BY change_timestamp DESC
@@ -151,9 +151,9 @@ def soft_delete_absent(
             )
 
 
-def update_last_sync(conn: Any, tool_id: int) -> None:
-    """Update `tools.last_sync_at` to NOW() for the given tool."""
-    sql = "UPDATE tools SET last_sync_at = NOW() WHERE id = %s"
+def update_last_sync(conn: Any, tool_id: str) -> None:
+    """Update `tools.last_sync_at` to NOW() for the given tool UUID."""
+    sql = "UPDATE tools SET last_sync_at = NOW() WHERE tool_id = %s::uuid"
     with conn.cursor() as cur:
         cur.execute(sql, (tool_id,))
     logger.debug("update_last_sync: tool_id=%s", tool_id)

@@ -16,7 +16,7 @@ SELECT
     CASE WHEN t.tool_name ILIKE %s THEN 'N/A' ELSE uta.last_login_date END AS last_login_date,
     uta.updated_at
 FROM user_tool_access uta
-JOIN tools t ON t.id = uta.tool_id
+JOIN tools t ON t.tool_id = uta.tool_id
 WHERE lower(uta.work_email) = lower(%s)
 ORDER BY t.tool_name
 """

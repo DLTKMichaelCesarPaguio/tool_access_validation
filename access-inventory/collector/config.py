@@ -40,21 +40,21 @@ CROWDSTRIKE_COMMERCIAL_CLIENT_SECRET: str = _get("CROWDSTRIKE_COMMERCIAL_CLIENT_
 CROWDSTRIKE_COMMERCIAL_BASE_URL: str = _get(
     "CROWDSTRIKE_COMMERCIAL_BASE_URL", "https://api.crowdstrike.com"
 )
-CROWDSTRIKE_COMMERCIAL_TOOL_ID: int = int(_get("CROWDSTRIKE_COMMERCIAL_TOOL_ID", "0"))
+CROWDSTRIKE_COMMERCIAL_TOOL_NAME: str = _get("CROWDSTRIKE_COMMERCIAL_TOOL_NAME", "CrowdStrike Commercial")
 
 CROWDSTRIKE_GCE_CLIENT_ID: str = _get("CROWDSTRIKE_GCE_CLIENT_ID")
 CROWDSTRIKE_GCE_CLIENT_SECRET: str = _get("CROWDSTRIKE_GCE_CLIENT_SECRET")
 CROWDSTRIKE_GCE_BASE_URL: str = _get(
     "CROWDSTRIKE_GCE_BASE_URL", "https://api.laggar.gcw.crowdstrike.com"
 )
-CROWDSTRIKE_GCE_TOOL_ID: int = int(_get("CROWDSTRIKE_GCE_TOOL_ID", "0"))
+CROWDSTRIKE_GCE_TOOL_NAME: str = _get("CROWDSTRIKE_GCE_TOOL_NAME", "CrowdStrike GCE")
 
 CROWDSTRIKE_GCCM_CLIENT_ID: str = _get("CROWDSTRIKE_GCCM_CLIENT_ID")
 CROWDSTRIKE_GCCM_CLIENT_SECRET: str = _get("CROWDSTRIKE_GCCM_CLIENT_SECRET")
 CROWDSTRIKE_GCCM_BASE_URL: str = _get(
     "CROWDSTRIKE_GCCM_BASE_URL", "https://api.crowdstrike.com"
 )
-CROWDSTRIKE_GCCM_TOOL_ID: int = int(_get("CROWDSTRIKE_GCCM_TOOL_ID", "0"))
+CROWDSTRIKE_GCCM_TOOL_NAME: str = _get("CROWDSTRIKE_GCCM_TOOL_NAME", "CrowdStrike GCCM")
 
 # ── Qualys ────────────────────────────────────────────────────────────────────
 QUALYS_COMMERCIAL_PROD_USERNAME: str = _get("QUALYS_COMMERCIAL_PROD_USERNAME")
@@ -62,43 +62,43 @@ QUALYS_COMMERCIAL_PROD_PASSWORD: str = _get("QUALYS_COMMERCIAL_PROD_PASSWORD")
 QUALYS_COMMERCIAL_PROD_BASE_URL: str = _get(
     "QUALYS_COMMERCIAL_PROD_BASE_URL", "https://qualysapi.qualys.com"
 )
-QUALYS_COMMERCIAL_PROD_TOOL_ID: int = int(_get("QUALYS_COMMERCIAL_PROD_TOOL_ID", "0"))
+QUALYS_COMMERCIAL_PROD_TOOL_NAME: str = _get("QUALYS_COMMERCIAL_PROD_TOOL_NAME", "Qualys Commercial Prod")
 
 QUALYS_COMMERCIAL_DEV_USERNAME: str = _get("QUALYS_COMMERCIAL_DEV_USERNAME")
 QUALYS_COMMERCIAL_DEV_PASSWORD: str = _get("QUALYS_COMMERCIAL_DEV_PASSWORD")
 QUALYS_COMMERCIAL_DEV_BASE_URL: str = _get(
     "QUALYS_COMMERCIAL_DEV_BASE_URL", "https://qualysapi.qualys.com"
 )
-QUALYS_COMMERCIAL_DEV_TOOL_ID: int = int(_get("QUALYS_COMMERCIAL_DEV_TOOL_ID", "0"))
+QUALYS_COMMERCIAL_DEV_TOOL_NAME: str = _get("QUALYS_COMMERCIAL_DEV_TOOL_NAME", "Qualys Commercial Dev/Test")
 
 QUALYS_GCE_USERNAME: str = _get("QUALYS_GCE_USERNAME")
 QUALYS_GCE_PASSWORD: str = _get("QUALYS_GCE_PASSWORD")
 QUALYS_GCE_BASE_URL: str = _get(
     "QUALYS_GCE_BASE_URL", "https://qualysapi.qg3.apps.qualys.com"
 )
-QUALYS_GCE_TOOL_ID: int = int(_get("QUALYS_GCE_TOOL_ID", "0"))
+QUALYS_GCE_TOOL_NAME: str = _get("QUALYS_GCE_TOOL_NAME", "Qualys GCE")
 
 QUALYS_GCCM_USERNAME: str = _get("QUALYS_GCCM_USERNAME")
 QUALYS_GCCM_PASSWORD: str = _get("QUALYS_GCCM_PASSWORD")
 QUALYS_GCCM_BASE_URL: str = _get(
     "QUALYS_GCCM_BASE_URL", "https://qualysapi.qg4.apps.qualys.com"
 )
-QUALYS_GCCM_TOOL_ID: int = int(_get("QUALYS_GCCM_TOOL_ID", "0"))
+QUALYS_GCCM_TOOL_NAME: str = _get("QUALYS_GCCM_TOOL_NAME", "Qualys GCCM")
 
 # ── Sophos ────────────────────────────────────────────────────────────────────
 SOPHOS_CLIENT_ID: str = _get("SOPHOS_CLIENT_ID")
 SOPHOS_CLIENT_SECRET: str = _get("SOPHOS_CLIENT_SECRET")
-SOPHOS_TOOL_ID: int = int(_get("SOPHOS_TOOL_ID", "0"))
+SOPHOS_TOOL_NAME: str = _get("SOPHOS_TOOL_NAME", "Sophos Central")
 
 # ── Burp Suite Enterprise ─────────────────────────────────────────────────────
 BURP_SUITE_API_KEY: str = _get("BURP_SUITE_API_KEY")
 BURP_SUITE_BASE_URL: str = _get("BURP_SUITE_BASE_URL", "https://burp.example.com")
-BURP_SUITE_TOOL_ID: int = int(_get("BURP_SUITE_TOOL_ID", "0"))
+BURP_SUITE_TOOL_NAME: str = _get("BURP_SUITE_TOOL_NAME", "Burp Suite Enterprise")
 
 # ── BlackDuck ─────────────────────────────────────────────────────────────────
 BLACKDUCK_API_TOKEN: str = _get("BLACKDUCK_API_TOKEN")
 BLACKDUCK_BASE_URL: str = _get("BLACKDUCK_BASE_URL", "https://blackduck.example.com")
-BLACKDUCK_TOOL_ID: int = int(_get("BLACKDUCK_TOOL_ID", "0"))
+BLACKDUCK_TOOL_NAME: str = _get("BLACKDUCK_TOOL_NAME", "Blackduck")
 
 # ── Checkmarx ─────────────────────────────────────────────────────────────────
 CHECKMARX_CLIENT_ID: str = _get("CHECKMARX_CLIENT_ID")
@@ -108,4 +108,4 @@ CHECKMARX_BASE_URL: str = _get("CHECKMARX_BASE_URL", "https://eu.iam.checkmarx.n
 CHECKMARX_API_BASE_URL: str = _get(
     "CHECKMARX_API_BASE_URL", "https://eu.ast.checkmarx.net"
 )
-CHECKMARX_TOOL_ID: int = int(_get("CHECKMARX_TOOL_ID", "0"))
+CHECKMARX_TOOL_NAME: str = _get("CHECKMARX_TOOL_NAME", "Checkmarx")

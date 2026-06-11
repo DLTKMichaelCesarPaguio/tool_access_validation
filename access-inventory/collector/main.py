@@ -38,130 +38,139 @@ def _build_collectors() -> list[Any]:
     # CrowdStrike — up to 3 environments
     cs_envs = [
         (
-            "CS Commercial",
+            config.CROWDSTRIKE_COMMERCIAL_TOOL_NAME,
             config.CROWDSTRIKE_COMMERCIAL_CLIENT_ID,
             config.CROWDSTRIKE_COMMERCIAL_CLIENT_SECRET,
             config.CROWDSTRIKE_COMMERCIAL_BASE_URL,
-            config.CROWDSTRIKE_COMMERCIAL_TOOL_ID,
         ),
         (
-            "CS GCE",
+            config.CROWDSTRIKE_GCE_TOOL_NAME,
             config.CROWDSTRIKE_GCE_CLIENT_ID,
             config.CROWDSTRIKE_GCE_CLIENT_SECRET,
             config.CROWDSTRIKE_GCE_BASE_URL,
-            config.CROWDSTRIKE_GCE_TOOL_ID,
         ),
         (
-            "CS GCCM",
+            config.CROWDSTRIKE_GCCM_TOOL_NAME,
             config.CROWDSTRIKE_GCCM_CLIENT_ID,
             config.CROWDSTRIKE_GCCM_CLIENT_SECRET,
             config.CROWDSTRIKE_GCCM_BASE_URL,
-            config.CROWDSTRIKE_GCCM_TOOL_ID,
         ),
     ]
-    for env_name, client_id, client_secret, base_url, tool_id in cs_envs:
-        if client_id and client_secret and tool_id:
+    for tool_name, client_id, client_secret, base_url in cs_envs:
+        if client_id and client_secret:
             collectors.append(CrowdStrikeCollector(
-                env_name=env_name,
+                env_name=tool_name,
                 client_id=client_id,
                 client_secret=client_secret,
                 base_url=base_url,
-                tool_id=tool_id,
+                tool_id=tool_name,
             ))
 
     # Qualys — up to 4 environments
     q_envs = [
         (
-            "Qualys Commercial Prod",
+            config.QUALYS_COMMERCIAL_PROD_TOOL_NAME,
             config.QUALYS_COMMERCIAL_PROD_USERNAME,
             config.QUALYS_COMMERCIAL_PROD_PASSWORD,
             config.QUALYS_COMMERCIAL_PROD_BASE_URL,
-            config.QUALYS_COMMERCIAL_PROD_TOOL_ID,
         ),
         (
-            "Qualys Commercial Dev",
+            config.QUALYS_COMMERCIAL_DEV_TOOL_NAME,
             config.QUALYS_COMMERCIAL_DEV_USERNAME,
             config.QUALYS_COMMERCIAL_DEV_PASSWORD,
             config.QUALYS_COMMERCIAL_DEV_BASE_URL,
-            config.QUALYS_COMMERCIAL_DEV_TOOL_ID,
         ),
         (
-            "Qualys GCE",
+            config.QUALYS_GCE_TOOL_NAME,
             config.QUALYS_GCE_USERNAME,
             config.QUALYS_GCE_PASSWORD,
             config.QUALYS_GCE_BASE_URL,
-            config.QUALYS_GCE_TOOL_ID,
         ),
         (
-            "Qualys GCCM",
+            config.QUALYS_GCCM_TOOL_NAME,
             config.QUALYS_GCCM_USERNAME,
             config.QUALYS_GCCM_PASSWORD,
             config.QUALYS_GCCM_BASE_URL,
-            config.QUALYS_GCCM_TOOL_ID,
         ),
     ]
-    for env_name, username, password, base_url, tool_id in q_envs:
-        if username and password and tool_id:
+    for tool_name, username, password, base_url in q_envs:
+        if username and password:
             collectors.append(QualysCollector(
-                env_name=env_name,
+                env_name=tool_name,
                 username=username,
                 password=password,
                 base_url=base_url,
-                tool_id=tool_id,
+                tool_id=tool_name,
             ))
 
     # Sophos
-    if config.SOPHOS_CLIENT_ID and config.SOPHOS_CLIENT_SECRET and config.SOPHOS_TOOL_ID:
+    if config.SOPHOS_CLIENT_ID and config.SOPHOS_CLIENT_SECRET:
         collectors.append(SophosCollector(
             client_id=config.SOPHOS_CLIENT_ID,
             client_secret=config.SOPHOS_CLIENT_SECRET,
-            tool_id=config.SOPHOS_TOOL_ID,
+            tool_id=config.SOPHOS_TOOL_NAME,
         ))
 
     # Burp Suite
-    if config.BURP_SUITE_API_KEY and config.BURP_SUITE_TOOL_ID:
+    if config.BURP_SUITE_API_KEY:
         collectors.append(BurpSuiteCollector(
             api_key=config.BURP_SUITE_API_KEY,
             base_url=config.BURP_SUITE_BASE_URL,
-            tool_id=config.BURP_SUITE_TOOL_ID,
+            tool_id=config.BURP_SUITE_TOOL_NAME,
         ))
 
     # BlackDuck
-    if config.BLACKDUCK_API_TOKEN and config.BLACKDUCK_TOOL_ID:
+    if config.BLACKDUCK_API_TOKEN:
         collectors.append(BlackDuckCollector(
             api_token=config.BLACKDUCK_API_TOKEN,
             base_url=config.BLACKDUCK_BASE_URL,
-            tool_id=config.BLACKDUCK_TOOL_ID,
+            tool_id=config.BLACKDUCK_TOOL_NAME,
         ))
 
     # Checkmarx
     if (config.CHECKMARX_CLIENT_ID and config.CHECKMARX_CLIENT_SECRET
-            and config.CHECKMARX_TENANT and config.CHECKMARX_TOOL_ID):
+            and config.CHECKMARX_TENANT):
         collectors.append(CheckmarxCollector(
             client_id=config.CHECKMARX_CLIENT_ID,
             client_secret=config.CHECKMARX_CLIENT_SECRET,
             iam_base_url=config.CHECKMARX_BASE_URL,
             api_base_url=config.CHECKMARX_API_BASE_URL,
             tenant=config.CHECKMARX_TENANT,
-            tool_id=config.CHECKMARX_TOOL_ID,
+            tool_id=config.CHECKMARX_TOOL_NAME,
         ))
 
     return collectors
 
 
+async def _resolve_tool_uuid(conn: psycopg.AsyncConnection, tool_name: str) -> str | None:
+    """Look up the UUID for a tool by its name in the tools table."""
+    async with conn.cursor() as cur:
+        await cur.execute(
+            "SELECT tool_id FROM tools WHERE tool_name = %s LIMIT 1", (tool_name,)
+        )
+        row = await cur.fetchone()
+        if row is None:
+            return None
+        return str(row[0])
+
+
 async def _run_vendor_collector(collector: Any, conn: psycopg.AsyncConnection) -> None:
-    tool_id: int = collector.tool_id
-    tool_name: str = type(collector).__name__
+    tool_name: str = collector.tool_id  # tool_id holds tool_name string until resolved
+    collector_class: str = type(collector).__name__
     try:
+        tool_uuid = await _resolve_tool_uuid(conn, tool_name)
+        if tool_uuid is None:
+            logger.warning("%s: tool_name=%r not found in tools table, skipping", collector_class, tool_name)
+            return
         rows = await collector.collect()
         if rows:
-            await upsert_tool_access(conn, tool_id, rows)
+            await upsert_tool_access(conn, tool_uuid, rows)
             present_emails = [r["work_email"] for r in rows if r.get("work_email")]
-            await soft_delete_absent(conn, tool_id, present_emails)
-        await update_last_sync(conn, tool_id)
-        logger.info("%s: synced %d records", tool_name, len(rows) if rows else 0)
+            await soft_delete_absent(conn, tool_uuid, present_emails)
+        await update_last_sync(conn, tool_uuid)
+        logger.info("%s (%s): synced %d records", collector_class, tool_name, len(rows) if rows else 0)
     except Exception as exc:
-        logger.error("%s: unhandled error during sync: %s", tool_name, exc)
+        logger.error("%s: unhandled error during sync: %s", collector_class, exc)
 
 
 async def _run_ad_collector(conn: psycopg.AsyncConnection) -> None:
