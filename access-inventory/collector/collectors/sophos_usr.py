@@ -32,11 +32,16 @@ class SophosCollector(BaseCollector):
     async def _fetch(self) -> list[dict]:
         async with make_client(timeout=30.0) as client:
             token = await self._get_token(client)
+            whoami = await self._get_whoami(client, token)
+            tenant_id = whoami["id"]
+            api_host = (whoami.get("apiHosts") or {}).get("dataRegion") or \
+                       (whoami.get("apiHosts") or {}).get("global") or \
+                       "https://api.central.sophos.com"
             headers = {
                 "Authorization": f"Bearer {token}",
-                "X-Tenant-ID": await self._get_tenant_id(client, token),
+                "X-Tenant-ID": tenant_id,
             }
-            return await self._get_admins(client, headers)
+            return await self._get_admins(client, headers, api_host)
 
     async def _get_token(self, client: httpx.AsyncClient) -> str:
         resp = await client.post(
@@ -51,16 +56,16 @@ class SophosCollector(BaseCollector):
         resp.raise_for_status()
         return resp.json()["access_token"]
 
-    async def _get_tenant_id(self, client: httpx.AsyncClient, token: str) -> str:
+    async def _get_whoami(self, client: httpx.AsyncClient, token: str) -> dict:
         resp = await client.get(
             "https://api.central.sophos.com/whoami/v1",
             headers={"Authorization": f"Bearer {token}"},
         )
         resp.raise_for_status()
-        return resp.json()["id"]
+        return resp.json()
 
     async def _get_admins(
-        self, client: httpx.AsyncClient, headers: dict
+        self, client: httpx.AsyncClient, headers: dict, api_host: str
     ) -> list[dict]:
         rows: list[dict] = []
         page_token: str | None = None
@@ -71,7 +76,7 @@ class SophosCollector(BaseCollector):
                 params["pageFromKey"] = page_token
 
             resp = await client.get(
-                "https://api.central.sophos.com/common/v1/admins",
+                f"{api_host}/common/v1/admins",
                 headers=headers,
                 params=params,
             )
