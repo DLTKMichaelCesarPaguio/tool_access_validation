@@ -44,6 +44,7 @@ class BurpSuiteCollector(BaseCollector):
                 continue
             rows.append({
                 "work_email": email,
+                "username": u.get("username") or email or None,
                 "status": "active",
                 "user_role": u.get("role"),
                 "last_login_date": u.get("last_login"),

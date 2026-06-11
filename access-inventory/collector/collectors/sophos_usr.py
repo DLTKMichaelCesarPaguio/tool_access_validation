@@ -89,6 +89,7 @@ class SophosCollector(BaseCollector):
                     continue
                 rows.append({
                     "work_email": email,
+                    "username": admin.get("name") or email or None,
                     "status": "active",
                     "user_role": admin.get("roleType"),
                     "last_login_date": None,

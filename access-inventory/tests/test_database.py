@@ -104,10 +104,11 @@ class TestSoftDeleteAbsent:
     async def test_uses_audit_log_timestamp_when_present(self):
         conn, cursor = _mock_conn()
         ts = datetime(2025, 8, 1, tzinfo=timezone.utc)
-        cursor.fetchall.return_value = [("gone@d.com",)]
+        cursor.fetchall.return_value = [("gone@d.com", "login1")]
         cursor.fetchone.return_value = (ts,)
 
-        await soft_delete_absent(conn, tool_id=FAKE_UUID, present_emails=["active@d.com"])
+        await soft_delete_absent(conn, tool_id=FAKE_UUID,
+                                 present_logins=[("active@d.com", "login0")])
 
         update_calls = [c for c in cursor.execute.call_args_list
                         if "UPDATE" in str(c[0][0]).upper()]
@@ -117,10 +118,11 @@ class TestSoftDeleteAbsent:
 
     async def test_falls_back_to_now_when_no_audit_log(self):
         conn, cursor = _mock_conn()
-        cursor.fetchall.return_value = [("gone@d.com",)]
+        cursor.fetchall.return_value = [("gone@d.com", None)]
         cursor.fetchone.return_value = None
 
-        await soft_delete_absent(conn, tool_id=FAKE_UUID, present_emails=["active@d.com"])
+        await soft_delete_absent(conn, tool_id=FAKE_UUID,
+                                 present_logins=[("active@d.com", None)])
 
         update_calls = [c for c in cursor.execute.call_args_list
                         if "UPDATE" in str(c[0][0]).upper()]
@@ -129,11 +131,12 @@ class TestSoftDeleteAbsent:
         datetime_params = [p for p in params if isinstance(p, datetime)]
         assert datetime_params, "Expected a datetime fallback when no audit log entry"
 
-    async def test_no_update_when_all_emails_present(self):
+    async def test_no_update_when_all_logins_present(self):
         conn, cursor = _mock_conn()
         cursor.fetchall.return_value = []
 
-        await soft_delete_absent(conn, tool_id=FAKE_UUID, present_emails=["a@d.com", "b@d.com"])
+        await soft_delete_absent(conn, tool_id=FAKE_UUID,
+                                 present_logins=[("a@d.com", "u1"), ("b@d.com", "u2")])
 
         update_calls = [c for c in cursor.execute.call_args_list
                         if "UPDATE" in str(c[0][0]).upper()]
@@ -141,16 +144,33 @@ class TestSoftDeleteAbsent:
 
     async def test_soft_delete_sets_inactive_status(self):
         conn, cursor = _mock_conn()
-        cursor.fetchall.return_value = [("gone@d.com",)]
+        cursor.fetchall.return_value = [("gone@d.com", "oldlogin")]
         cursor.fetchone.return_value = None
 
-        await soft_delete_absent(conn, tool_id=FAKE_UUID, present_emails=[])
+        await soft_delete_absent(conn, tool_id=FAKE_UUID, present_logins=[])
 
         update_calls = [c for c in cursor.execute.call_args_list
                         if "UPDATE" in str(c[0][0]).upper()]
         assert len(update_calls) == 1
         sql = update_calls[0][0][0]
         assert "inactive" in sql.lower()
+
+    async def test_only_absent_login_deactivated_not_sibling(self):
+        """When email has two logins and one disappears, only that login is deactivated."""
+        conn, cursor = _mock_conn()
+        # DB says login2 is absent; login1 is still present
+        cursor.fetchall.return_value = [("user@d.com", "login2")]
+        cursor.fetchone.return_value = None
+
+        await soft_delete_absent(conn, tool_id=FAKE_UUID,
+                                 present_logins=[("user@d.com", "login1")])
+
+        update_calls = [c for c in cursor.execute.call_args_list
+                        if "UPDATE" in str(c[0][0]).upper()]
+        assert len(update_calls) == 1
+        # The UPDATE params must reference login2, not login1
+        params = update_calls[0][0][1]
+        assert "login2" in params
 
 
 # ── update_last_sync ──────────────────────────────────────────────────────────

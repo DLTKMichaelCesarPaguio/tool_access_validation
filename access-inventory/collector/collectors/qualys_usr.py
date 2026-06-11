@@ -73,17 +73,32 @@ class QualysCollector(BaseCollector):
         rows: list[dict] = []
 
         for user_el in root.iter("USER"):
-            email = self._text(user_el, "EMAIL")
+            contact = user_el.find("CONTACT_INFO")
+            email = self._text(contact, "EMAIL") if contact is not None else None
             if not email:
                 continue
+
+            raw_status = (self._text(user_el, "USER_STATUS") or "").strip()
+            if raw_status == "Active":
+                status = "active"
+            elif raw_status == "Inactive":
+                status = "inactive"
+            else:
+                status = "pending"
+
             rows.append({
                 "work_email": email.lower(),
-                "status": "active",
+                "status": status,
                 "user_role": self._text(user_el, "USER_ROLE"),
                 "last_login_date": self._text(user_el, "LAST_LOGIN_DATE"),
+                "first_name": self._text(contact, "FIRSTNAME"),
+                "last_name": self._text(contact, "LASTNAME"),
+                "username": self._text(user_el, "USER_LOGIN"),
+                "external_user_id": self._text(user_el, "EXTERNAL_ID"),
+                "granted_date": self._text(user_el, "CREATION_DATE"),
             })
 
-        logger.info("Qualys[%s]: collected %d users", self.env_name, len(rows))
+        logger.info("Qualys[%s]: collected %d logins", self.env_name, len(rows))
         return rows
 
     @staticmethod

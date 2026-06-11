@@ -13,12 +13,13 @@ SELECT
     t.tool_name,
     CASE WHEN t.tool_name ILIKE %s THEN 'Active Access' ELSE uta.status END AS status,
     uta.user_role,
+    uta.username,
     CASE WHEN t.tool_name ILIKE %s THEN 'N/A' ELSE uta.last_login_date END AS last_login_date,
     uta.updated_at
 FROM user_tool_access uta
 JOIN tools t ON t.tool_id = uta.tool_id
 WHERE lower(uta.work_email) = lower(%s)
-ORDER BY t.tool_name
+ORDER BY t.tool_name, uta.username NULLS LAST
 """
 
 _AD_PROFILE_SQL = """

@@ -279,6 +279,7 @@
     <thead>
       <tr>
         <th>Tool / Environment</th>
+        <th>Username</th>
         <th>Status</th>
         <th>Role</th>
         <th>Last Login</th>
@@ -288,6 +289,7 @@
       {% for row in tool_access %}
       <tr>
         <td>{{ row.tool_name | e }}</td>
+        <td>{{ row.username or '—' }}</td>
         <td>
           {% set s = (row.status or '') | lower %}
           {% if 'active' in s %}

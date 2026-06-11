@@ -165,8 +165,11 @@ async def _run_vendor_collector(collector: Any, conn: psycopg.AsyncConnection) -
         rows = await collector.collect()
         if rows:
             await upsert_tool_access(conn, tool_uuid, rows)
-            present_emails = [r["work_email"] for r in rows if r.get("work_email")]
-            await soft_delete_absent(conn, tool_uuid, present_emails)
+            present_logins = [
+                (r["work_email"], r.get("username"))
+                for r in rows if r.get("work_email")
+            ]
+            await soft_delete_absent(conn, tool_uuid, present_logins)
         await update_last_sync(conn, tool_uuid)
         logger.info("%s (%s): synced %d records", collector_class, tool_name, len(rows) if rows else 0)
     except Exception as exc:

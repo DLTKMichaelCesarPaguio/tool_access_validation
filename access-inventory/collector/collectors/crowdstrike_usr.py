@@ -143,8 +143,12 @@ class CrowdStrikeCollector(BaseCollector):
             resp.raise_for_status()
             resources = resp.json().get("resources") or []
             for u in resources:
+                email = (u.get("uid") or "").lower()
                 rows.append({
-                    "work_email": (u.get("uid") or "").lower(),
+                    "work_email": email,
+                    "username": email or None,
+                    "first_name": u.get("first_name"),
+                    "last_name": u.get("last_name"),
                     "status": "active",
                     "user_role": u.get("roles", [None])[0] if u.get("roles") else None,
                     "last_login_date": u.get("last_login_at"),

@@ -78,7 +78,7 @@ async def test_run_vendor_collector_happy_path():
     ):
         await _run_vendor_collector(mock_collector, mock_conn)
         mock_upsert.assert_awaited_once_with(mock_conn, fake_uuid, [{"work_email": "a@d.com", "status": "active"}])
-        mock_soft.assert_awaited_once_with(mock_conn, fake_uuid, ["a@d.com"])
+        mock_soft.assert_awaited_once_with(mock_conn, fake_uuid, [("a@d.com", None)])
         mock_sync.assert_awaited_once_with(mock_conn, fake_uuid)
 
 
