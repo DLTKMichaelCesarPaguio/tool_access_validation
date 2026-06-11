@@ -4,7 +4,7 @@ import logging
 
 import httpx
 
-from collector.collectors.base import BaseCollector
+from collector.collectors.base import BaseCollector, make_client
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class CheckmarxCollector(BaseCollector):
             return []
 
     async def _fetch(self) -> list[dict]:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with make_client(timeout=30.0) as client:
             token = await self._get_token(client)
             headers = {"Authorization": f"Bearer {token}"}
             return await self._get_users(client, headers)

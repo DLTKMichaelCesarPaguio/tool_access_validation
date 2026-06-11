@@ -6,7 +6,7 @@ from base64 import b64encode
 import defusedxml.ElementTree as ET
 import httpx
 
-from collector.collectors.base import BaseCollector
+from collector.collectors.base import BaseCollector, make_client
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class QualysCollector(BaseCollector):
             "X-Requested-With": "AccessInventoryCollector",
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with make_client(timeout=60.0) as client:
             resp = await client.post(
                 f"{self.base_url}/msp/user_list.php",
                 headers=headers,

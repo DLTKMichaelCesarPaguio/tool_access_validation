@@ -38,7 +38,10 @@ class TestUpsertUsers:
              "job_title": "", "department": "", "employee_id": "3", "is_active": True},
         ]
         await upsert_users(conn, rows)
-        assert cursor.execute.call_count == 3
+        # Each row: SAVEPOINT + INSERT + RELEASE = 3 calls per row
+        insert_calls = [c for c in cursor.execute.call_args_list
+                        if "INSERT" in str(c[0][0]).upper()]
+        assert len(insert_calls) == 3
 
     async def test_sql_contains_on_conflict(self):
         conn, cursor = _mock_conn()
@@ -46,7 +49,10 @@ class TestUpsertUsers:
                  "last_name": "", "job_title": "", "department": "", "employee_id": "1",
                  "is_active": True}]
         await upsert_users(conn, rows)
-        sql = cursor.execute.call_args[0][0]
+        insert_calls = [c for c in cursor.execute.call_args_list
+                        if "INSERT" in str(c[0][0]).upper()]
+        assert insert_calls, "Expected at least one INSERT call"
+        sql = insert_calls[0][0][0]
         assert "ON CONFLICT" in sql.upper()
         assert "IS DISTINCT FROM" in sql.upper()
 

@@ -20,15 +20,16 @@ async def upsert_users(conn: Any, rows: list[dict]) -> None:
     sql = """
         INSERT INTO users (
             email, first_name, last_name,
-            job_title, department, employee_id, is_active, updated_at
+            job_title, department, employee_id, is_employee, is_active, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
         ON CONFLICT (email) DO UPDATE SET
             first_name  = EXCLUDED.first_name,
             last_name   = EXCLUDED.last_name,
             job_title   = EXCLUDED.job_title,
             department  = EXCLUDED.department,
             employee_id = EXCLUDED.employee_id,
+            is_employee = EXCLUDED.is_employee,
             is_active   = EXCLUDED.is_active,
             updated_at  = NOW()
         WHERE (users.first_name, users.last_name,
@@ -37,17 +38,58 @@ async def upsert_users(conn: Any, rows: list[dict]) -> None:
               (EXCLUDED.first_name, EXCLUDED.last_name,
                EXCLUDED.job_title, EXCLUDED.department, EXCLUDED.is_active)
     """
+    # Fallback when employee_id collides with another AD entry (duplicate employeeID in AD)
+    sql_no_empid = """
+        INSERT INTO users (
+            email, first_name, last_name,
+            job_title, department, is_employee, is_active, updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        ON CONFLICT (email) DO UPDATE SET
+            first_name  = EXCLUDED.first_name,
+            last_name   = EXCLUDED.last_name,
+            job_title   = EXCLUDED.job_title,
+            department  = EXCLUDED.department,
+            is_employee = EXCLUDED.is_employee,
+            is_active   = EXCLUDED.is_active,
+            updated_at  = NOW()
+        WHERE (users.first_name, users.last_name,
+               users.job_title, users.department, users.is_active)
+           IS DISTINCT FROM
+              (EXCLUDED.first_name, EXCLUDED.last_name,
+               EXCLUDED.job_title, EXCLUDED.department, EXCLUDED.is_active)
+    """
+
+    import psycopg as _psycopg
     async with conn.cursor() as cur:
         for row in rows:
-            await cur.execute(sql, (
-                row.get("email"),
-                row.get("first_name"),
-                row.get("last_name"),
-                row.get("job_title"),
-                row.get("department"),
-                row.get("employee_id"),
-                row.get("is_active", True),
-            ))
+            employee_id = row.get("employee_id")
+            await cur.execute("SAVEPOINT upsert_user")
+            try:
+                await cur.execute(sql, (
+                    row.get("email"),
+                    row.get("first_name"),
+                    row.get("last_name"),
+                    row.get("job_title"),
+                    row.get("department"),
+                    employee_id,
+                    row.get("is_employee", employee_id is not None),
+                    row.get("is_active", True),
+                ))
+                await cur.execute("RELEASE SAVEPOINT upsert_user")
+            except _psycopg.errors.UniqueViolation:
+                # Duplicate employee_id from another AD entry — insert without it
+                await cur.execute("ROLLBACK TO SAVEPOINT upsert_user")
+                await cur.execute("RELEASE SAVEPOINT upsert_user")
+                await cur.execute(sql_no_empid, (
+                    row.get("email"),
+                    row.get("first_name"),
+                    row.get("last_name"),
+                    row.get("job_title"),
+                    row.get("department"),
+                    False,
+                    row.get("is_active", True),
+                ))
 
     logger.info("upsert_users: processed %d rows", len(rows))
 

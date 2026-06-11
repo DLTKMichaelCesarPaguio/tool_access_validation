@@ -4,7 +4,7 @@ import logging
 
 import httpx
 
-from collector.collectors.base import BaseCollector
+from collector.collectors.base import BaseCollector, make_client
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class BurpSuiteCollector(BaseCollector):
 
     async def _fetch(self) -> list[dict]:
         headers = {"Authorization": f"Bearer {self.api_key}"}
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with make_client(timeout=30.0) as client:
             resp = await client.get(
                 f"{self.base_url}/api/v1/users",
                 headers=headers,

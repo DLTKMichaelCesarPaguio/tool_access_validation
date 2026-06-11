@@ -12,7 +12,7 @@ from collector.ldap_tls import build_server
 logger = logging.getLogger(__name__)
 
 _ATTRIBUTES = [
-    "dn", "cn", "sn", "givenName", "displayName",
+    "cn", "sn", "givenName", "displayName",
     "mail", "title", "department", "employeeID", "distinguishedName",
 ]
 
@@ -82,6 +82,7 @@ class AdCollector:
     @staticmethod
     def _map(entry: Any) -> dict:
         attrs = entry.entry_attributes_as_dict
+        employee_id = _first(attrs, "employeeID")
         return {
             "email": _first(attrs, "mail"),
             "full_name": _first(attrs, "displayName"),
@@ -89,6 +90,7 @@ class AdCollector:
             "last_name": _first(attrs, "sn"),
             "job_title": _first(attrs, "title"),
             "department": _first(attrs, "department"),
-            "employee_id": _first(attrs, "employeeID"),
+            "employee_id": employee_id,
+            "is_employee": employee_id is not None,
             "is_active": True,
         }
