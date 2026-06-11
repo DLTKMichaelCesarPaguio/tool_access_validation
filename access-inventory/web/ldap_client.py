@@ -8,8 +8,10 @@ from ldap3.core.exceptions import LDAPException
 
 from collector.ldap_tls import build_server
 
-# Only allow characters safe in LDAP filter values to prevent injection
-_SAFE_INPUT_RE = re.compile(r"^[a-zA-Z0-9._@\-]+$")
+# Only allow characters safe in LDAP filter values to prevent injection.
+# Space is permitted so callers can pass "First Last" for name searches;
+# it is harmless inside a (givenName=First*) filter value.
+_SAFE_INPUT_RE = re.compile(r"^[a-zA-Z0-9._@\- ]+$")
 
 _SEARCH_ATTRS = [
     "mail", "displayName", "givenName", "sn",
@@ -43,6 +45,40 @@ def search_by_email(
     """
     _sanitize(email)
     search_filter = f"(mail={email}*)"
+
+    server = build_server(host, port, use_ssl, ca_cert)
+    with Connection(
+        server,
+        user=bind_dn,
+        password=bind_password,
+        auto_bind=True,
+    ) as conn:
+        conn.search(
+            search_base=base_dn,
+            search_filter=search_filter,
+            attributes=_SEARCH_ATTRS,
+        )
+        return [_map_entry(e) for e in conn.entries]
+
+
+def search_by_name(
+    host: str,
+    port: int,
+    use_ssl: bool,
+    bind_dn: str,
+    bind_password: str,
+    base_dn: str,
+    first_name: str,
+    last_name: str,
+    ca_cert: str = "",
+) -> list[dict]:
+    """Search AD for users matching a first-name + last-name prefix pair.
+
+    Raises ValueError on unsafe input, LDAPException on connection failure.
+    """
+    _sanitize(first_name)
+    _sanitize(last_name)
+    search_filter = f"(&(givenName={first_name}*)(sn={last_name}*))"
 
     server = build_server(host, port, use_ssl, ca_cert)
     with Connection(

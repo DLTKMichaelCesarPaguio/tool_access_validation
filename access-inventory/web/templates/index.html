@@ -190,6 +190,12 @@
       padding: 0.5rem 0;
     }
 
+    .picker-row {
+      cursor: pointer;
+    }
+
+    .picker-row:hover td { background: #e9f0ff; }
+
     footer {
       margin-top: 2rem;
       font-size: 0.75rem;
@@ -207,12 +213,12 @@
 <div class="search-box">
   <form method="post" action="/search">
     <div style="flex:1">
-      <label for="email">Email address</label>
+      <label for="email">Search by name, email, or username</label>
       <input
         id="email"
         name="email"
         type="text"
-        placeholder="firstname.lastname@deltek.com"
+        placeholder="e.g. Firstname Lastname, email@deltek.com, or username"
         value="{{ query | e }}"
         autocomplete="off"
         autofocus
@@ -224,6 +230,43 @@
 
 {% if error %}
 <div class="error-banner" role="alert">{{ error | e }}</div>
+{% endif %}
+
+{% if picker_users %}
+<div class="card">
+  <h2>
+    {{ picker_users | length }}{% if picker_users | length == 50 %}+{% endif %}
+    user{{ 's' if picker_users | length != 1 }} found for &ldquo;{{ query | e }}&rdquo;
+    {% if picker_users | length == 50 %}
+      <span style="font-weight:400;font-size:.8125rem;color:#5e6c84;margin-left:.5rem;">
+        Showing first 50 &mdash; refine your search for better results
+      </span>
+    {% endif %}
+  </h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Full Name</th>
+        <th>Email</th>
+        <th>Department</th>
+        <th>Job Title</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in picker_users %}
+      <tr class="picker-row" onclick="document.getElementById('picker-form-{{ loop.index }}').submit()">
+        <td>{{ u.full_name or ((u.first_name or '') ~ ' ' ~ (u.last_name or '')) | trim or '—' }}</td>
+        <td>{{ u.email or '—' }}</td>
+        <td>{{ u.department or '—' }}</td>
+        <td>{{ u.job_title or '—' }}</td>
+      </tr>
+      <form id="picker-form-{{ loop.index }}" method="post" action="/search" style="display:none">
+        <input type="hidden" name="email" value="{{ u.email | e }}" />
+      </form>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endif %}
 
 {% if ad_profile %}

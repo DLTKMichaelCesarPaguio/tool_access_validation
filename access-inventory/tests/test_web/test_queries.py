@@ -4,7 +4,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from web.queries import get_tool_access, get_ad_profile, _BLACKDUCK_NAME
+from web.queries import (
+    get_tool_access,
+    get_ad_profile,
+    search_users_by_name,
+    search_users_by_username,
+    _BLACKDUCK_NAME,
+    _PICKER_LIMIT,
+)
 
 
 def _make_cursor(rows, columns):
@@ -88,3 +95,87 @@ async def test_get_ad_profile_returns_none_when_not_found():
 
     result = await get_ad_profile(conn, "ghost@d.com")
     assert result is None
+
+
+# ── search_users_by_name ───────────────────────────────────────────────────────
+
+async def test_search_users_by_name_returns_rows():
+    cols = ["email", "full_name", "first_name", "last_name", "job_title", "department"]
+    rows = [
+        ("michael.p@d.com", "Michael Paguio", "Michael", "Paguio", "Engineer", "IT"),
+        ("michael.c@d.com", "Michael Cruz", "Michael", "Cruz", "Analyst", "Finance"),
+    ]
+    cursor = _make_cursor(rows, cols)
+    conn = _make_conn(cursor)
+
+    result = await search_users_by_name(conn, "michael")
+    assert len(result) == 2
+    assert result[0]["first_name"] == "Michael"
+
+
+async def test_search_users_by_name_fullname_split():
+    cols = ["email", "full_name", "first_name", "last_name", "job_title", "department"]
+    rows = [("michael.p@d.com", "Michael Paguio", "Michael", "Paguio", "Engineer", "IT")]
+    cursor = _make_cursor(rows, cols)
+    conn = _make_conn(cursor)
+
+    result = await search_users_by_name(conn, "michael paguio", first="michael", last="paguio")
+    assert len(result) == 1
+    assert result[0]["last_name"] == "Paguio"
+
+    # Fullname query uses different SQL — both first% and last% must be in params
+    params = cursor.execute.call_args[0][1]
+    param_strs = [str(p) for p in params]
+    assert any("michael" in s.lower() for s in param_strs)
+    assert any("paguio" in s.lower() for s in param_strs)
+
+
+async def test_search_users_by_name_passes_limit():
+    cols = ["email", "full_name", "first_name", "last_name", "job_title", "department"]
+    cursor = _make_cursor([], cols)
+    conn = _make_conn(cursor)
+
+    await search_users_by_name(conn, "mark")
+    params = cursor.execute.call_args[0][1]
+    assert _PICKER_LIMIT in params
+
+
+async def test_search_users_by_name_empty_result():
+    cols = ["email", "full_name", "first_name", "last_name", "job_title", "department"]
+    cursor = _make_cursor([], cols)
+    conn = _make_conn(cursor)
+
+    result = await search_users_by_name(conn, "zzznobody")
+    assert result == []
+
+
+# ── search_users_by_username ───────────────────────────────────────────────────
+
+async def test_search_users_by_username_returns_rows():
+    cols = ["email", "full_name", "first_name", "last_name", "job_title", "department"]
+    rows = [("kibria@d.com", "Kibria Ghulam", "Kibria", "Ghulam", "Security", "IT")]
+    cursor = _make_cursor(rows, cols)
+    conn = _make_conn(cursor)
+
+    result = await search_users_by_username(conn, "detek3kg")
+    assert len(result) == 1
+    assert result[0]["email"] == "kibria@d.com"
+
+
+async def test_search_users_by_username_passes_limit():
+    cols = ["email", "full_name", "first_name", "last_name", "job_title", "department"]
+    cursor = _make_cursor([], cols)
+    conn = _make_conn(cursor)
+
+    await search_users_by_username(conn, "detek")
+    params = cursor.execute.call_args[0][1]
+    assert _PICKER_LIMIT in params
+
+
+async def test_search_users_by_username_empty_result():
+    cols = ["email", "full_name", "first_name", "last_name", "job_title", "department"]
+    cursor = _make_cursor([], cols)
+    conn = _make_conn(cursor)
+
+    result = await search_users_by_username(conn, "zzznobody")
+    assert result == []

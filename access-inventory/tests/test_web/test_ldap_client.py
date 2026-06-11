@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from web.ldap_client import _sanitize, search_by_email
+from web.ldap_client import _sanitize, search_by_email, search_by_name
 
 
 def test_sanitize_accepts_valid_email():
@@ -11,6 +11,10 @@ def test_sanitize_accepts_valid_email():
 
 def test_sanitize_accepts_prefix():
     assert _sanitize("john.doe") == "john.doe"
+
+
+def test_sanitize_accepts_space_for_name_search():
+    assert _sanitize("michael paguio") == "michael paguio"
 
 
 def test_sanitize_rejects_ldap_injection():
@@ -49,4 +53,32 @@ def test_search_by_email_raises_value_error_on_unsafe_input():
             bind_password="pass",
             base_dn="dc=test",
             email="bad)(input",
+        )
+
+
+def test_search_by_name_raises_value_error_on_unsafe_first_name():
+    with pytest.raises(ValueError):
+        search_by_name(
+            host="ldap.example.com",
+            port=389,
+            use_ssl=False,
+            bind_dn="cn=svc,dc=test",
+            bind_password="pass",
+            base_dn="dc=test",
+            first_name="bad)(name",
+            last_name="Smith",
+        )
+
+
+def test_search_by_name_raises_value_error_on_unsafe_last_name():
+    with pytest.raises(ValueError):
+        search_by_name(
+            host="ldap.example.com",
+            port=389,
+            use_ssl=False,
+            bind_dn="cn=svc,dc=test",
+            bind_password="pass",
+            base_dn="dc=test",
+            first_name="John",
+            last_name="bad)(name",
         )
