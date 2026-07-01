@@ -76,44 +76,44 @@ async def test_http_error_returns_empty_list():
 
 
 @respx.mock
-async def test_organization_scoped_credentials_fan_out_to_tenants():
-    """Organization-level API creds have no admins of their own — the
-    collector must enumerate tenants under the org and pull admins per-tenant."""
+async def test_organization_scoped_credentials_use_organization_admins_endpoint():
+    """Organization-level API creds must read the enterprise admin roster from
+    /organization/v1/admins — this is the Global Settings "Admins and Roles"
+    list (cross-tenant enterprise/read-only admins), not any single tenant's
+    /common/v1/admins, which has no visibility into enterprise-level admins."""
     respx.post("https://id.sophos.com/api/v2/oauth2/token").mock(
         return_value=Response(200, json={"access_token": "stok"})
     )
     respx.get("https://api.central.sophos.com/whoami/v1").mock(
         return_value=Response(200, json={"id": "org-1", "idType": "organization"})
     )
-    respx.get("https://api.central.sophos.com/organization/v1/tenants").mock(
+    respx.get("https://api.central.sophos.com/organization/v1/admins").mock(
         return_value=Response(200, json={
             "items": [
-                {"id": "tenant-a", "apiHost": "https://api-us01.central.sophos.com"},
-                {"id": "tenant-b", "apiHost": "https://api-us02.central.sophos.com"},
+                {
+                    "username": "Admin@deltek.com",
+                    "profile": {"name": "Admin One"},
+                    "roleAssignments": [{"scope": {"type": "organization"}}],
+                },
+                {
+                    "username": "viewer@deltek.com",
+                    "profile": {"name": "Viewer Two"},
+                    "roleAssignments": [{"scope": {"type": "tenant", "id": "t1"}}],
+                },
             ],
-            "pages": {},
-        })
-    )
-    respx.get("https://api-us01.central.sophos.com/common/v1/admins").mock(
-        return_value=Response(200, json={
-            "items": [{"email": "a@d.com", "roleType": "admin"}],
-            "pages": {},
-        })
-    )
-    respx.get("https://api-us02.central.sophos.com/common/v1/admins").mock(
-        return_value=Response(200, json={
-            "items": [{"email": "b@d.com", "roleType": "readOnly"}],
-            "pages": {},
+            "pages": {"current": 1, "size": 100, "total": 1, "items": 2, "maxSize": 1000},
         })
     )
 
     rows = await _collector().collect()
     assert len(rows) == 2
-    assert {r["work_email"] for r in rows} == {"a@d.com", "b@d.com"}
+    assert rows[0]["work_email"] == "admin@deltek.com"
+    assert rows[0]["username"] == "Admin One"
+    assert rows[0]["status"] == "active"
 
 
 @respx.mock
-async def test_organization_tenant_enumeration_follows_next_key():
+async def test_organization_admins_pagination_follows_page_total():
     respx.post("https://id.sophos.com/api/v2/oauth2/token").mock(
         return_value=Response(200, json={"access_token": "stok"})
     )
@@ -123,29 +123,24 @@ async def test_organization_tenant_enumeration_follows_next_key():
 
     call_count = 0
 
-    def tenants_handler(request):
+    def admins_handler(request):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
             return Response(200, json={
-                "items": [{"id": "tenant-a", "apiHost": "https://api-us01.central.sophos.com"}],
-                "pages": {"nextKey": "page2key"},
+                "items": [{"username": "a@d.com", "profile": {"name": "A"}, "roleAssignments": []}],
+                "pages": {"current": 1, "size": 1, "total": 2, "items": 2, "maxSize": 1000},
             })
         return Response(200, json={
-            "items": [{"id": "tenant-b", "apiHost": "https://api-us02.central.sophos.com"}],
-            "pages": {},
+            "items": [{"username": "b@d.com", "profile": {"name": "B"}, "roleAssignments": []}],
+            "pages": {"current": 2, "size": 1, "total": 2, "items": 2, "maxSize": 1000},
         })
 
-    respx.get("https://api.central.sophos.com/organization/v1/tenants").mock(
-        side_effect=tenants_handler
-    )
-    respx.get("https://api-us01.central.sophos.com/common/v1/admins").mock(
-        return_value=Response(200, json={"items": [{"email": "a@d.com", "roleType": "admin"}], "pages": {}})
-    )
-    respx.get("https://api-us02.central.sophos.com/common/v1/admins").mock(
-        return_value=Response(200, json={"items": [{"email": "b@d.com", "roleType": "admin"}], "pages": {}})
+    respx.get("https://api.central.sophos.com/organization/v1/admins").mock(
+        side_effect=admins_handler
     )
 
     rows = await _collector().collect()
     assert call_count == 2
     assert len(rows) == 2
+    assert {r["work_email"] for r in rows} == {"a@d.com", "b@d.com"}

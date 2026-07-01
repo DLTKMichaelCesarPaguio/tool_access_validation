@@ -35,7 +35,7 @@ class SophosCollector(BaseCollector):
             whoami = await self._get_whoami(client, token)
 
             if whoami.get("idType") == "organization":
-                return await self._fetch_organization(client, token, whoami["id"])
+                return await self._get_organization_admins(client, token, whoami["id"])
 
             tenant_id = whoami["id"]
             api_host = (whoami.get("apiHosts") or {}).get("dataRegion") or \
@@ -47,52 +47,49 @@ class SophosCollector(BaseCollector):
             }
             return await self._get_admins(client, headers, api_host)
 
-    async def _fetch_organization(
+    async def _get_organization_admins(
         self, client: httpx.AsyncClient, token: str, organization_id: str
     ) -> list[dict]:
-        """Organization-scoped credentials have no admins of their own —
-        enumerate tenants under the org and collect each tenant's admins."""
-        rows: list[dict] = []
-        for tenant_id, api_host in await self._get_tenants(client, token, organization_id):
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "X-Tenant-ID": tenant_id,
-            }
-            rows.extend(await self._get_admins(client, headers, api_host))
-        return rows
-
-    async def _get_tenants(
-        self, client: httpx.AsyncClient, token: str, organization_id: str
-    ) -> list[tuple[str, str]]:
-        tenants: list[tuple[str, str]] = []
-        page_token: str | None = None
+        """Enterprise-level admins (Global Settings > Admins and Roles) live
+        at /organization/v1/admins — a single cross-tenant roster, distinct
+        from any individual tenant's /common/v1/admins list. Paginated by
+        page number, not by cursor, unlike the other Sophos endpoints."""
         headers = {
             "Authorization": f"Bearer {token}",
             "X-Organization-ID": organization_id,
         }
+        rows: list[dict] = []
+        page = 1
 
         while True:
-            params: dict = {"pageSize": 100}
-            if page_token:
-                params["pageFromKey"] = page_token
-
             resp = await client.get(
-                "https://api.central.sophos.com/organization/v1/tenants",
+                "https://api.central.sophos.com/organization/v1/admins",
                 headers=headers,
-                params=params,
+                params={"pageSize": 100, "page": page, "pageTotal": True},
             )
             resp.raise_for_status()
             data = resp.json()
 
-            for tenant in data.get("items") or []:
-                api_host = tenant.get("apiHost") or "https://api.central.sophos.com"
-                tenants.append((tenant["id"], api_host))
+            for admin in data.get("items") or []:
+                email = (admin.get("username") or "").lower()
+                if not email:
+                    continue
+                roles = admin.get("roleAssignments") or []
+                rows.append({
+                    "work_email": email,
+                    "username": (admin.get("profile") or {}).get("name") or email,
+                    "status": "active",
+                    "user_role": roles[0]["scope"]["type"] if roles else None,
+                    "last_login_date": None,
+                })
 
-            page_token = (data.get("pages") or {}).get("nextKey")
-            if not page_token:
+            pages = data.get("pages") or {}
+            if page >= (pages.get("total") or 1):
                 break
+            page += 1
 
-        return tenants
+        logger.info("Sophos: collected %d organization admins", len(rows))
+        return rows
 
     async def _get_token(self, client: httpx.AsyncClient) -> str:
         resp = await client.post(
