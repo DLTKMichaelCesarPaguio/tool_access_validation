@@ -73,3 +73,79 @@ async def test_http_error_returns_empty_list():
     )
     rows = await _collector().collect()
     assert rows == []
+
+
+@respx.mock
+async def test_organization_scoped_credentials_fan_out_to_tenants():
+    """Organization-level API creds have no admins of their own — the
+    collector must enumerate tenants under the org and pull admins per-tenant."""
+    respx.post("https://id.sophos.com/api/v2/oauth2/token").mock(
+        return_value=Response(200, json={"access_token": "stok"})
+    )
+    respx.get("https://api.central.sophos.com/whoami/v1").mock(
+        return_value=Response(200, json={"id": "org-1", "idType": "organization"})
+    )
+    respx.get("https://api.central.sophos.com/organization/v1/tenants").mock(
+        return_value=Response(200, json={
+            "items": [
+                {"id": "tenant-a", "apiHost": "https://api-us01.central.sophos.com"},
+                {"id": "tenant-b", "apiHost": "https://api-us02.central.sophos.com"},
+            ],
+            "pages": {},
+        })
+    )
+    respx.get("https://api-us01.central.sophos.com/common/v1/admins").mock(
+        return_value=Response(200, json={
+            "items": [{"email": "a@d.com", "roleType": "admin"}],
+            "pages": {},
+        })
+    )
+    respx.get("https://api-us02.central.sophos.com/common/v1/admins").mock(
+        return_value=Response(200, json={
+            "items": [{"email": "b@d.com", "roleType": "readOnly"}],
+            "pages": {},
+        })
+    )
+
+    rows = await _collector().collect()
+    assert len(rows) == 2
+    assert {r["work_email"] for r in rows} == {"a@d.com", "b@d.com"}
+
+
+@respx.mock
+async def test_organization_tenant_enumeration_follows_next_key():
+    respx.post("https://id.sophos.com/api/v2/oauth2/token").mock(
+        return_value=Response(200, json={"access_token": "stok"})
+    )
+    respx.get("https://api.central.sophos.com/whoami/v1").mock(
+        return_value=Response(200, json={"id": "org-1", "idType": "organization"})
+    )
+
+    call_count = 0
+
+    def tenants_handler(request):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return Response(200, json={
+                "items": [{"id": "tenant-a", "apiHost": "https://api-us01.central.sophos.com"}],
+                "pages": {"nextKey": "page2key"},
+            })
+        return Response(200, json={
+            "items": [{"id": "tenant-b", "apiHost": "https://api-us02.central.sophos.com"}],
+            "pages": {},
+        })
+
+    respx.get("https://api.central.sophos.com/organization/v1/tenants").mock(
+        side_effect=tenants_handler
+    )
+    respx.get("https://api-us01.central.sophos.com/common/v1/admins").mock(
+        return_value=Response(200, json={"items": [{"email": "a@d.com", "roleType": "admin"}], "pages": {}})
+    )
+    respx.get("https://api-us02.central.sophos.com/common/v1/admins").mock(
+        return_value=Response(200, json={"items": [{"email": "b@d.com", "roleType": "admin"}], "pages": {}})
+    )
+
+    rows = await _collector().collect()
+    assert call_count == 2
+    assert len(rows) == 2
