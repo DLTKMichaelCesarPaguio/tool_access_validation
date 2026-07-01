@@ -19,6 +19,33 @@ def _make_connection(entries: list) -> MagicMock:
     conn.__exit__ = MagicMock(return_value=False)
     conn.entries = entries
     conn.search.return_value = True
+    conn.result = {"controls": {}}
+    return conn
+
+
+def _make_paged_connection(pages: list[list]) -> MagicMock:
+    """Simulate a server that returns entries across multiple pages via
+    the paged-results cookie, ending when the server returns an empty cookie."""
+    conn = MagicMock()
+    conn.__enter__ = MagicMock(return_value=conn)
+    conn.__exit__ = MagicMock(return_value=False)
+
+    state = {"page": 0}
+
+    def _search(*args, **kwargs):
+        idx = state["page"]
+        conn.entries = pages[idx]
+        is_last_page = idx == len(pages) - 1
+        cookie = b"" if is_last_page else f"cookie-{idx}".encode()
+        conn.result = {
+            "controls": {
+                "1.2.840.113556.1.4.319": {"value": {"cookie": cookie}}
+            }
+        }
+        state["page"] += 1
+        return True
+
+    conn.search.side_effect = _search
     return conn
 
 
@@ -95,6 +122,37 @@ class TestAdCollector:
             assert row["job_title"] is None
             assert row["department"] is None
             assert row["employee_id"] is None
+
+    def test_fetch_pages_past_1000_result_server_cap(self):
+        """AD's non-paged search silently caps at 1000 entries (MaxResultSetSize).
+        fetch() must use paged search so counts above that cap aren't truncated."""
+        page1 = [
+            _make_ldap_entry({
+                "mail": [f"user{i}@deltek.com"],
+                "displayName": [f"User {i}"],
+                "givenName": ["User"],
+                "sn": [str(i)],
+                "employeeID": [f"E{i:04d}"],
+            })
+            for i in range(1000)
+        ]
+        page2 = [
+            _make_ldap_entry({
+                "mail": [f"user{i}@deltek.com"],
+                "displayName": [f"User {i}"],
+                "givenName": ["User"],
+                "sn": [str(i)],
+                "employeeID": [f"E{i:04d}"],
+            })
+            for i in range(1000, 1243)
+        ]
+        mock_conn = _make_paged_connection([page1, page2])
+
+        with patch("collector.collectors.ad_usr.Connection", MagicMock(return_value=mock_conn)), \
+             patch("collector.ldap_tls.build_server", return_value=MagicMock()):
+            rows = self._collector().fetch()
+            assert len(rows) == 1243
+            assert mock_conn.search.call_count == 2
 
     def test_ldap_exception_propagates(self):
         from ldap3.core.exceptions import LDAPException

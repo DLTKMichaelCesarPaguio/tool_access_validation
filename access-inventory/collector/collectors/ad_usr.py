@@ -52,21 +52,38 @@ class AdCollector:
         self.ca_cert = ca_cert
 
     def fetch(self) -> list[dict]:
-        """Fetch all AD users and return them as a list of dicts (no DB call)."""
+        """Fetch all AD users and return them as a list of dicts (no DB call).
+
+        Uses paged search — AD enforces a 1000-entry MaxResultSetSize on
+        non-paged searches, which silently truncates results with no error.
+        """
         server = build_server(self.host, self.port, self.use_ssl, self.ca_cert)
 
+        entries = []
         with Connection(
             server,
             user=self.bind_dn,
             password=self.bind_password,
             auto_bind=True,
         ) as ldap_conn:
-            ldap_conn.search(
-                search_base=self.base_dn,
-                search_filter="(mail=*)",
-                attributes=_ATTRIBUTES,
-            )
-            entries = ldap_conn.entries
+            cookie = None
+            while True:
+                ldap_conn.search(
+                    search_base=self.base_dn,
+                    search_filter="(mail=*)",
+                    attributes=_ATTRIBUTES,
+                    paged_size=1000,
+                    paged_cookie=cookie,
+                )
+                entries.extend(ldap_conn.entries)
+                cookie = (
+                    ldap_conn.result.get("controls", {})
+                    .get("1.2.840.113556.1.4.319", {})
+                    .get("value", {})
+                    .get("cookie")
+                )
+                if not cookie:
+                    break
 
         rows = [self._map(e) for e in entries]
         return [r for r in rows if r.get("email")]
